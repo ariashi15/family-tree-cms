@@ -1,0 +1,14 @@
+{
+  "name": "family-tree-cms",
+  "private": true,
+  "packageManager": "pnpm@10.13.1",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @family-tree-cms/web --filter @family-tree-cms/api dev",
+    "build": "pnpm --recursive build",
+    "start": "pnpm --parallel --filter @family-tree-cms/web --filter @family-tree-cms/api start"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
+
