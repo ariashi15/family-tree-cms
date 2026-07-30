@@ -162,6 +162,24 @@ function toEditableMember(member: Member): EditableMember {
   };
 }
 
+function getFirstName(value: string) {
+  return value.trim().split(/\s+/)[0]?.toLocaleLowerCase() ?? "";
+}
+
+function sortMembersByFirstName(memberList: EditableMember[]) {
+  return [...memberList].sort((left, right) => {
+    const firstNameComparison = getFirstName(left.memberName).localeCompare(
+      getFirstName(right.memberName),
+    );
+
+    if (firstNameComparison !== 0) {
+      return firstNameComparison;
+    }
+
+    return left.memberName.localeCompare(right.memberName);
+  });
+}
+
 function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<Tab>("members");
@@ -171,6 +189,7 @@ function App() {
   const [membersSuccess, setMembersSuccess] = useState("");
   const [isMembersLoading, setIsMembersLoading] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
   const [newMemberForm, setNewMemberForm] = useState<NewMemberForm>({
     memberName: "",
     memberBig: "",
@@ -209,7 +228,11 @@ function App() {
         return;
       }
 
-      setMembers((payload as MembersResponse).members.map(toEditableMember));
+      setMembers(
+        sortMembersByFirstName(
+          (payload as MembersResponse).members.map(toEditableMember),
+        ),
+      );
     } catch {
       setMembersError("The member list could not be loaded. Please check the API connection.");
     } finally {
@@ -336,6 +359,11 @@ function App() {
   };
 
   const invalidPairings = pairings.filter((pairing) => pairing.errors.length > 0);
+  const filteredMembers = members.filter((member) =>
+    member.memberName
+      .toLocaleLowerCase()
+      .includes(memberSearchQuery.trim().toLocaleLowerCase()),
+  );
   const canUpload =
     pairings.length > 0 &&
     invalidPairings.length === 0 &&
@@ -899,6 +927,23 @@ function App() {
             ) : members.length === 0 ? (
               <div className="empty-state">No member rows were found in the database.</div>
             ) : (
+              <>
+                <div className="search-row">
+                  <label className="search-field">
+                    <span>Search members by name</span>
+                    <input
+                      className="cell-input"
+                      type="search"
+                      placeholder="Start typing a member name"
+                      value={memberSearchQuery}
+                      onChange={(event) => setMemberSearchQuery(event.target.value)}
+                    />
+                  </label>
+                </div>
+
+                {filteredMembers.length === 0 ? (
+                  <div className="empty-state">No members match that search.</div>
+                ) : (
               <div className="table-scroll">
                 <table>
                   <thead>
@@ -912,7 +957,7 @@ function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {members.map((member) => (
+                    {filteredMembers.map((member) => (
                       <tr key={member.id}>
                         <td>
                           <input
@@ -1000,6 +1045,8 @@ function App() {
                   </tbody>
                 </table>
               </div>
+                )}
+              </>
             )}
           </section>
         ) : (

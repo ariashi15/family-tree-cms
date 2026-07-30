@@ -376,6 +376,24 @@ h1 {
   margin: 0.9rem 0 0;
 }
 
+.search-row {
+  padding: 1.25rem 2rem 1rem;
+}
+
+.search-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.search-field span {
+  color: #566153;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .format-guide {
   margin: 0 2rem 2rem;
   padding: 1.35rem 1.5rem;
@@ -756,6 +774,11 @@ tbody tr.skipped-row:hover {
   }
 
   .add-member-panel {
+    padding-right: 1.25rem;
+    padding-left: 1.25rem;
+  }
+
+  .search-row {
     padding-right: 1.25rem;
     padding-left: 1.25rem;
   }
