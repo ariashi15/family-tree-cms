@@ -310,19 +310,15 @@ function App() {
     <div className="app-shell">
       <header className="site-header">
         <a className="brand" href="/" aria-label="Family Tree CMS home">
-          <span className="brand-mark" aria-hidden="true">
-            FT
-          </span>
-          <span>Family Tree CMS</span>
+          <span>CSA Family Tree Content Management System</span>
         </a>
       </header>
 
       <main>
         <div className="page-heading">
-          <p className="eyebrow">Pairing management</p>
           <h1>Upload mentor pairings</h1>
           <p className="intro">
-            Add mentor and mentee relationships to the family tree from a CSV
+            Add mentor and mentee relationships to the family trees from a CSV
             file.
           </p>
         </div>
@@ -330,7 +326,6 @@ function App() {
         <section className="upload-card" aria-labelledby="upload-heading">
           <div className="card-heading">
             <div>
-              <p className="step">Step 1 of 1</p>
               <h2 id="upload-heading">Choose your CSV file</h2>
             </div>
             <span className="file-type">CSV</span>
