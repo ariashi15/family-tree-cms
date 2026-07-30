@@ -834,27 +834,6 @@ function App() {
                   <p className="eyebrow">Manual entry</p>
                   <h3>Add new member</h3>
                 </div>
-                <button
-                  className="continue-button"
-                  type="button"
-                  disabled={newMemberForm.isSubmitting}
-                  onClick={() => {
-                    const formError = validateNewMemberForm();
-
-                    if (formError) {
-                      setNewMemberForm((currentForm) => ({
-                        ...currentForm,
-                        error: formError,
-                      }));
-                      setMembersError(formError);
-                      return;
-                    }
-
-                    void createMember(false);
-                  }}
-                >
-                  {newMemberForm.isSubmitting ? "Adding…" : "Add new member"}
-                </button>
               </div>
 
               <div className="add-member-grid">
@@ -913,6 +892,31 @@ function App() {
                     <option value="true">Yes</option>
                   </select>
                 </label>
+
+                <div className="field-group field-action">
+                  <span>&nbsp;</span>
+                  <button
+                    className="continue-button add-member-button"
+                    type="button"
+                    disabled={newMemberForm.isSubmitting}
+                    onClick={() => {
+                      const formError = validateNewMemberForm();
+
+                      if (formError) {
+                        setNewMemberForm((currentForm) => ({
+                          ...currentForm,
+                          error: formError,
+                        }));
+                        setMembersError(formError);
+                        return;
+                      }
+
+                      void createMember(false);
+                    }}
+                  >
+                    {newMemberForm.isSubmitting ? "Adding…" : "Add"}
+                  </button>
+                </div>
               </div>
 
               {newMemberForm.error && (

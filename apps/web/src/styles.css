@@ -354,14 +354,21 @@ h1 {
 
 .add-member-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
   gap: 0.9rem;
+  width: 100%;
+  align-items: end;
 }
 
 .field-group {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+}
+
+.field-action {
+  justify-content: flex-end;
+  align-items: flex-end;
 }
 
 .field-group span {
@@ -374,6 +381,11 @@ h1 {
 
 .inline-error {
   margin: 0.9rem 0 0;
+}
+
+.add-member-button {
+  width: 7rem;
+  align-self: flex-start;
 }
 
 .search-row {
