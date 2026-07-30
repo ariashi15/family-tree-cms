@@ -401,10 +401,16 @@ function App() {
   };
 
   const invalidPairings = pairings.filter((pairing) => pairing.errors.length > 0);
+  const normalizedMemberSearchQuery = memberSearchQuery.trim().toLocaleLowerCase();
   const filteredMembers = members.filter((member) =>
-    member.memberName
-      .toLocaleLowerCase()
-      .includes(memberSearchQuery.trim().toLocaleLowerCase()),
+    !normalizedMemberSearchQuery
+      ? true
+      : member.memberName
+          .toLocaleLowerCase()
+          .includes(normalizedMemberSearchQuery) ||
+        member.memberBig
+          .toLocaleLowerCase()
+          .includes(normalizedMemberSearchQuery),
   );
   const canUpload =
     pairings.length > 0 &&
