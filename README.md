@@ -43,6 +43,17 @@ cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
 ```
 
+Add your Supabase project credentials to `apps/api/.env`:
+
+```sh
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_SECRET_KEY=your-secret-key
+SUPABASE_MEMBERS_TABLE=members
+```
+
+Use the Supabase service role key on the API only. Do not place it in the
+frontend `.env` file.
+
 ## Development
 
 Run the frontend and backend together:
@@ -57,6 +68,36 @@ pnpm dev
 
 The backend's `CORS_ORIGIN` setting accepts a comma-separated list of allowed
 origins. Add the separate client application's origin when it is known.
+
+## API endpoints
+
+The backend currently exposes these endpoints:
+
+- `GET /api/health` returns API status and whether Supabase is configured
+- `GET /api/members` returns rows from the members table
+- `POST /api/pairings/import` creates missing mentor and mentee rows
+
+`POST /api/pairings/import` expects this JSON body:
+
+```json
+{
+  "pairings": [
+    {
+      "mentor_name": "Maya Thompson",
+      "mentee_name": "Jordan Lee",
+      "dynasty": "fire"
+    }
+  ]
+}
+```
+
+Import behavior:
+
+- If a mentor already exists as `member_name`, no new mentor row is inserted.
+- If a mentee already exists as `member_name`, no new mentee row is inserted.
+- If a mentor is missing, a row is created with `member_big` set to `null`.
+- If a mentee is missing, a row is created with `member_big` set to the
+  pairing's mentor name.
 
 ## Build and production start
 
@@ -80,4 +121,3 @@ Individual applications can also be run with pnpm filters, for example:
 pnpm --filter @family-tree-cms/api dev
 pnpm --filter @family-tree-cms/web build
 ```
-
