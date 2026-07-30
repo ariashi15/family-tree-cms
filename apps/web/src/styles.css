@@ -651,10 +651,52 @@ tbody tr.skipped-row:hover {
   background: #fcfdfb;
 }
 
+.cell-input-member-name {
+  color: #111612;
+  font-weight: 600;
+  background: #f2f5ef;
+}
+
 .cell-input:focus,
 .cell-select:focus {
   outline: 2px solid #bdd3c0;
   outline-offset: 1px;
+}
+
+.cell-select-dynasty-fire {
+  border-color: #e4b8b5;
+  color: #9b2f2f;
+  background: #fff0ee;
+}
+
+.cell-select-dynasty-wind {
+  border-color: #e6d28b;
+  color: #8b6812;
+  background: #fff7d6;
+}
+
+.cell-select-dynasty-earth {
+  border-color: #bfd6b8;
+  color: #356442;
+  background: #eef8ec;
+}
+
+.cell-select-dynasty-water {
+  border-color: #b7cfe6;
+  color: #2b5f96;
+  background: #eef6ff;
+}
+
+.cell-select-dynasty-head-true {
+  border-color: #d4c0eb;
+  color: #6c43a6;
+  background: #f5effd;
+}
+
+.cell-select-dynasty-head-false {
+  border-color: #ced3d8;
+  color: #5f6770;
+  background: #f4f6f8;
 }
 
 .row-action {

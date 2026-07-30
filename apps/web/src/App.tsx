@@ -202,6 +202,18 @@ function formatBool(value: "true" | "false") {
   return value === "true" ? "Yes" : "No";
 }
 
+function formatDynasty(value: string) {
+  return value ? value[0].toUpperCase() + value.slice(1) : value;
+}
+
+function getDynastySelectClass(dynasty: string) {
+  return `cell-select cell-select-dynasty cell-select-dynasty-${dynasty}`;
+}
+
+function getDynastyHeadSelectClass(value: "true" | "false") {
+  return `cell-select cell-select-dynasty-head cell-select-dynasty-head-${value}`;
+}
+
 function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<Tab>("members");
@@ -550,12 +562,14 @@ function App() {
 
     if (current.memberBig.trim() !== original.memberBig.trim()) {
       summaryLines.push(
-        `Member Big: ${original.memberBig || "null"} -> ${current.memberBig || "null"}`,
+        `Big: ${original.memberBig || "null"} -> ${current.memberBig || "null"}`,
       );
     }
 
     if (current.dynasty !== original.dynasty) {
-      summaryLines.push(`Dynasty: ${original.dynasty} -> ${current.dynasty}`);
+      summaryLines.push(
+        `Dynasty: ${formatDynasty(original.dynasty)} -> ${formatDynasty(current.dynasty)}`,
+      );
     }
 
     if (current.isDynastyHead !== original.isDynastyHead) {
@@ -574,7 +588,7 @@ function App() {
 
       if (affectedRows.length > 0) {
         effectLines.push(
-          `${affectedRows.length} ${affectedRows.length === 1 ? "row" : "rows"} will update Member Big from ${original.memberName} to ${current.memberName}.`,
+          `${affectedRows.length} ${affectedRows.length === 1 ? "row" : "rows"} will update Big from ${original.memberName} to ${current.memberName}.`,
         );
       }
     }
@@ -608,7 +622,7 @@ function App() {
 
     if (affectedRows.length > 0) {
       effectLines.push(
-        `${affectedRows.length} ${affectedRows.length === 1 ? "row" : "rows"} will update Member Big from ${current.memberName} to null.`,
+        `${affectedRows.length} ${affectedRows.length === 1 ? "row" : "rows"} will update Big from ${current.memberName} to null.`,
       );
     }
 
@@ -693,8 +707,8 @@ function App() {
             mentorName: payload.missingMentorName,
             summaryLines: [
               `Member Name: ${trimmedMemberName}`,
-              `Member Big: ${trimmedMemberBig || "null"}`,
-              `Dynasty: ${newMemberForm.dynasty}`,
+              `Big: ${trimmedMemberBig || "null"}`,
+              `Dynasty: ${formatDynasty(newMemberForm.dynasty)}`,
               `Dynasty Head: ${formatBool(newMemberForm.isDynastyHead)}`,
             ],
             effectLines: [
@@ -844,7 +858,6 @@ function App() {
             : member,
         ),
       );
-      setMembersSuccess(`Saved changes for ${updatedMember.member_name}.`);
       await loadMembers();
     } catch {
       setMembersError("The member could not be updated. Please check the API connection.");
@@ -958,11 +971,10 @@ function App() {
               <strong>Editing rules</strong>
               <ul>
                 <li><span className="inline-code-label">Member Name</span> is required and must be unique.</li>
-                <li><span className="inline-code-label">Member Big</span> is optional, but if you set it, that mentor must already exist.</li>
+                <li><span className="inline-code-label">Big</span> is optional, but if you set it, that mentor must already exist.</li>
                 <li>A member cannot list themself as their own mentor.</li>
-                <li><span className="inline-code-label">Dynasty</span> must be <span className="inline-code-label">fire</span>, <span className="inline-code-label">water</span>, <span className="inline-code-label">earth</span>, or <span className="inline-code-label">wind</span>.</li>
                 <li>When you rename a member, any mentees linked to that member are updated automatically.</li>
-                <li>When you delete a mentor, affected <span className="inline-code-label">Member Big</span> values are cleared to <span className="inline-code-label">null</span> automatically.</li>
+                <li>When you delete a mentor, affected <span className="inline-code-label">Big</span> values are cleared to <span className="inline-code-label">null</span> automatically.</li>
                 <li>Adding a member with a missing mentor will prompt you to confirm creating that mentor too.</li>
               </ul>
             </div>
@@ -970,12 +982,6 @@ function App() {
             {membersError && (
               <p className="error-message panel-message" role="alert">
                 {membersError}
-              </p>
-            )}
-
-            {membersSuccess && (
-              <p className="success-message panel-message" role="status">
-                {membersSuccess}
               </p>
             )}
 
@@ -1001,11 +1007,11 @@ function App() {
                 </label>
 
                 <label className="field-group">
-                  <span>Member big</span>
+                  <span>Big</span>
                   <input
                     className="cell-input"
                     type="text"
-                    placeholder="No mentor"
+                    placeholder="None"
                     value={newMemberForm.memberBig}
                     onChange={(event) =>
                       updateNewMemberField("memberBig", event.target.value)
@@ -1016,7 +1022,7 @@ function App() {
                 <label className="field-group">
                   <span>Dynasty</span>
                   <select
-                    className="cell-select"
+                    className={getDynastySelectClass(newMemberForm.dynasty)}
                     value={newMemberForm.dynasty}
                     onChange={(event) =>
                       updateNewMemberField("dynasty", event.target.value)
@@ -1024,7 +1030,7 @@ function App() {
                   >
                     {allowedDynasties.map((dynasty) => (
                       <option key={dynasty} value={dynasty}>
-                        {dynasty}
+                        {formatDynasty(dynasty)}
                       </option>
                     ))}
                   </select>
@@ -1033,7 +1039,7 @@ function App() {
                 <label className="field-group">
                   <span>Dynasty head</span>
                   <select
-                    className="cell-select"
+                    className={getDynastyHeadSelectClass(newMemberForm.isDynastyHead)}
                     value={newMemberForm.isDynastyHead}
                     onChange={(event) =>
                       updateNewMemberField("isDynastyHead", event.target.value)
@@ -1085,11 +1091,11 @@ function App() {
               <>
                 <div className="search-row">
                   <label className="search-field">
-                    <span>Search members by name</span>
+                    <span>Search by name</span>
                     <input
                       className="cell-input"
                       type="search"
-                      placeholder="Start typing a member name"
+                      placeholder="Start typing a name..."
                       value={memberSearchQuery}
                       onChange={(event) => setMemberSearchQuery(event.target.value)}
                     />
@@ -1104,7 +1110,7 @@ function App() {
                   <thead>
                     <tr>
                       <th scope="col">Member Name</th>
-                      <th scope="col">Member Big</th>
+                      <th scope="col">Big</th>
                       <th scope="col">Dynasty</th>
                       <th scope="col">Dynasty Head</th>
                       <th scope="col">Save</th>
@@ -1116,7 +1122,7 @@ function App() {
                       <tr key={member.id}>
                         <td>
                           <input
-                            className="cell-input"
+                            className="cell-input cell-input-member-name"
                             type="text"
                             value={member.memberName}
                             onChange={(event) =>
@@ -1130,7 +1136,7 @@ function App() {
                             className="cell-input"
                             type="text"
                             value={member.memberBig}
-                            placeholder="No mentor"
+                            placeholder="None"
                             onChange={(event) =>
                               updateMemberField(member.id, "memberBig", event.target.value)
                             }
@@ -1138,7 +1144,7 @@ function App() {
                         </td>
                         <td>
                           <select
-                            className="cell-select"
+                            className={getDynastySelectClass(member.dynasty)}
                             value={member.dynasty}
                             onChange={(event) =>
                               updateMemberField(member.id, "dynasty", event.target.value)
@@ -1146,14 +1152,14 @@ function App() {
                           >
                             {allowedDynasties.map((dynasty) => (
                               <option key={dynasty} value={dynasty}>
-                                {dynasty}
+                                {formatDynasty(dynasty)}
                               </option>
                             ))}
                           </select>
                         </td>
                         <td>
                           <select
-                            className="cell-select"
+                            className={getDynastyHeadSelectClass(member.isDynastyHead)}
                             value={member.isDynastyHead}
                             onChange={(event) =>
                               updateMemberField(
@@ -1387,7 +1393,7 @@ function App() {
                           <td>{pairing.mentorName}</td>
                           <td>{pairing.menteeName}</td>
                           <td>
-                            <span className="dynasty-pill">{pairing.dynasty}</span>
+                            <span className="dynasty-pill">{formatDynasty(pairing.dynasty)}</span>
                           </td>
                           <td className="validation-cell">
                             {pairing.errors.length ? (
