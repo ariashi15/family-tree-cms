@@ -292,6 +292,8 @@ app.patch("/api/members/:id", async (request, response) => {
   }
 
   let createdMentor: MemberRow | null = null;
+  const { create_missing_mentor: createMissingMentor, ...memberUpdates } =
+    updates;
 
   if (updates.member_big) {
     if (updates.member_big.toLocaleLowerCase() === normalizedMemberName) {
@@ -318,7 +320,7 @@ app.patch("/api/members/:id", async (request, response) => {
     );
 
     if (!matchingMentor) {
-      if (!updates.create_missing_mentor) {
+      if (!createMissingMentor) {
         response.status(409).json({
           error: `${updates.member_big} does not exist in the database as a member yet.`,
           missingMentorName: updates.member_big,
@@ -347,7 +349,7 @@ app.patch("/api/members/:id", async (request, response) => {
 
   const { data, error } = await supabase
     .from(membersTable)
-    .update(updates)
+    .update(memberUpdates)
     .eq("id", memberId)
     .select("id, created_at, member_name, member_big, dynasty, is_dynasty_head")
     .single();
