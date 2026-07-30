@@ -744,6 +744,7 @@ function App() {
         currentMembers.filter((member) => member.id !== memberId),
       );
       setMembersSuccess("The row was deleted.");
+      await loadMembers();
     } catch {
       setMembersError("The member could not be deleted. Please check the API connection.");
     }
