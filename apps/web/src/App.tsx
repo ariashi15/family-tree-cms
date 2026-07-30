@@ -75,15 +75,22 @@ type ConfirmDialogState =
   | {
       type: "save";
       memberId: string;
+      createMissingMentor: boolean;
+      summaryLines: string[];
+      effectLines: string[];
     }
   | {
       type: "delete";
       memberId: string;
       memberName: string;
+      summaryLines: string[];
+      effectLines: string[];
     }
   | {
       type: "create-missing-mentor";
       mentorName: string;
+      summaryLines: string[];
+      effectLines: string[];
     }
   | null;
 
@@ -99,6 +106,13 @@ type NewMemberForm = {
 type UploadSuccessDialogState = {
   message: string;
 } | null;
+
+type MemberSnapshot = {
+  memberName: string;
+  memberBig: string;
+  dynasty: (typeof allowedDynasties)[number];
+  isDynastyHead: "true" | "false";
+};
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} bytes`;
@@ -184,6 +198,10 @@ function sortMembersByFirstName(memberList: EditableMember[]) {
   });
 }
 
+function formatBool(value: "true" | "false") {
+  return value === "true" ? "Yes" : "No";
+}
+
 function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<Tab>("members");
@@ -194,6 +212,9 @@ function App() {
   const [isMembersLoading, setIsMembersLoading] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
   const [memberSearchQuery, setMemberSearchQuery] = useState("");
+  const [memberSnapshots, setMemberSnapshots] = useState<Record<string, MemberSnapshot>>(
+    {},
+  );
   const [newMemberForm, setNewMemberForm] = useState<NewMemberForm>({
     memberName: "",
     memberBig: "",
@@ -237,6 +258,19 @@ function App() {
       setMembers(
         sortMembersByFirstName(
           (payload as MembersResponse).members.map(toEditableMember),
+        ),
+      );
+      setMemberSnapshots(
+        Object.fromEntries(
+          (payload as MembersResponse).members.map((member) => [
+            member.id,
+            {
+              memberName: member.member_name,
+              memberBig: member.member_big ?? "",
+              dynasty: member.dynasty,
+              isDynastyHead: member.is_dynasty_head ? "true" : "false",
+            } satisfies MemberSnapshot,
+          ]),
         ),
       );
     } catch {
@@ -493,6 +527,88 @@ function App() {
     });
   };
 
+  const buildSaveSummary = (memberId: string, createMissingMentor: boolean) => {
+    const current = members.find((member) => member.id === memberId);
+    const original = memberSnapshots[memberId];
+
+    if (!current || !original) return { summaryLines: [], effectLines: [] };
+
+    const summaryLines: string[] = [];
+    const effectLines: string[] = [];
+
+    if (current.memberName.trim() !== original.memberName.trim()) {
+      summaryLines.push(
+        `Member Name: ${original.memberName || "null"} -> ${current.memberName || "null"}`,
+      );
+    }
+
+    if (current.memberBig.trim() !== original.memberBig.trim()) {
+      summaryLines.push(
+        `Member Big: ${original.memberBig || "null"} -> ${current.memberBig || "null"}`,
+      );
+    }
+
+    if (current.dynasty !== original.dynasty) {
+      summaryLines.push(`Dynasty: ${original.dynasty} -> ${current.dynasty}`);
+    }
+
+    if (current.isDynastyHead !== original.isDynastyHead) {
+      summaryLines.push(
+        `Dynasty Head: ${formatBool(original.isDynastyHead)} -> ${formatBool(current.isDynastyHead)}`,
+      );
+    }
+
+    if (current.memberName.trim() !== original.memberName.trim()) {
+      const affectedRows = members.filter(
+        (member) =>
+          member.id !== memberId &&
+          member.memberBig.trim().toLocaleLowerCase() ===
+            original.memberName.trim().toLocaleLowerCase(),
+      );
+
+      if (affectedRows.length > 0) {
+        effectLines.push(
+          `${affectedRows.length} ${affectedRows.length === 1 ? "row" : "rows"} will update Member Big from ${original.memberName} to ${current.memberName}.`,
+        );
+      }
+    }
+
+    if (createMissingMentor && current.memberBig.trim()) {
+      effectLines.push(
+        `${current.memberBig.trim()} does not exist in the database, so a new row for ${current.memberBig.trim()} will also be created.`,
+      );
+    }
+
+    return {
+      summaryLines:
+        summaryLines.length > 0 ? summaryLines : ["No visible field changes."],
+      effectLines,
+    };
+  };
+
+  const buildDeleteSummary = (memberId: string) => {
+    const current = members.find((member) => member.id === memberId);
+
+    if (!current) return { summaryLines: [], effectLines: [] };
+
+    const summaryLines = [`Delete row for ${current.memberName}.`];
+    const effectLines: string[] = [];
+    const affectedRows = members.filter(
+      (member) =>
+        member.id !== memberId &&
+        member.memberBig.trim().toLocaleLowerCase() ===
+          current.memberName.trim().toLocaleLowerCase(),
+    );
+
+    if (affectedRows.length > 0) {
+      effectLines.push(
+        `${affectedRows.length} ${affectedRows.length === 1 ? "row" : "rows"} will update Member Big from ${current.memberName} to null.`,
+      );
+    }
+
+    return { summaryLines, effectLines };
+  };
+
   const validateNewMemberForm = () => {
     const trimmedMemberName = newMemberForm.memberName.trim();
     const trimmedMemberBig = newMemberForm.memberBig.trim();
@@ -569,6 +685,15 @@ function App() {
           setConfirmDialog({
             type: "create-missing-mentor",
             mentorName: payload.missingMentorName,
+            summaryLines: [
+              `Member Name: ${trimmedMemberName}`,
+              `Member Big: ${trimmedMemberBig || "null"}`,
+              `Dynasty: ${newMemberForm.dynasty}`,
+              `Dynasty Head: ${formatBool(newMemberForm.isDynastyHead)}`,
+            ],
+            effectLines: [
+              `${payload.missingMentorName} does not exist in the database, so a new row for ${payload.missingMentorName} will also be created.`,
+            ],
           });
           return;
         }
@@ -610,19 +735,13 @@ function App() {
     }
   };
 
-  const saveMember = async (memberId: string) => {
+  const saveMember = async (memberId: string, createMissingMentor = false) => {
     const target = members.find((member) => member.id === memberId);
 
     if (!target) return;
 
     const trimmedMemberName = target.memberName.trim();
     const trimmedMemberBig = target.memberBig.trim();
-    const duplicateMember = members.find(
-      (member) =>
-        member.id !== memberId &&
-        member.memberName.trim().toLocaleLowerCase() ===
-          trimmedMemberName.toLocaleLowerCase(),
-    );
 
     let rowError = "";
 
@@ -630,22 +749,11 @@ function App() {
       rowError = "Member name is required.";
     } else if (!allowedDynasties.includes(target.dynasty)) {
       rowError = "Dynasty must be fire, water, earth, or wind.";
-    } else if (duplicateMember) {
-      rowError = `${trimmedMemberName} already exists in the editor.`;
     } else if (
       trimmedMemberBig &&
       trimmedMemberBig.toLocaleLowerCase() === trimmedMemberName.toLocaleLowerCase()
     ) {
       rowError = "A member cannot list themself as their own mentor.";
-    } else if (
-      trimmedMemberBig &&
-      !members.some(
-        (member) =>
-          member.memberName.trim().toLocaleLowerCase() ===
-          trimmedMemberBig.toLocaleLowerCase(),
-      )
-    ) {
-      rowError = `${trimmedMemberBig} does not exist in the database as a member.`;
     }
 
     if (rowError) {
@@ -679,12 +787,35 @@ function App() {
           member_big: target.memberBig.trim() || null,
           dynasty: target.dynasty,
           is_dynasty_head: target.isDynastyHead === "true",
+          create_missing_mentor: createMissingMentor,
         }),
       });
 
-      const payload = (await response.json()) as MemberResponse | ApiErrorResponse;
+      const payload = (await response.json()) as
+        | MemberResponse
+        | (ApiErrorResponse & {
+            requiresMentorConfirmation?: boolean;
+            missingMentorName?: string;
+          });
 
       if (!response.ok) {
+        if (
+          response.status === 409 &&
+          "requiresMentorConfirmation" in payload &&
+          payload.requiresMentorConfirmation &&
+          payload.missingMentorName
+        ) {
+          const { summaryLines, effectLines } = buildSaveSummary(memberId, true);
+          setConfirmDialog({
+            type: "save",
+            memberId,
+            createMissingMentor: true,
+            summaryLines,
+            effectLines,
+          });
+          return;
+        }
+
         const rowError =
           "error" in payload && payload.error
             ? payload.error
@@ -757,7 +888,10 @@ function App() {
     setConfirmDialog(null);
 
     if (currentDialog.type === "save") {
-      await saveMember(currentDialog.memberId);
+      await saveMember(
+        currentDialog.memberId,
+        currentDialog.createMissingMentor,
+      );
       return;
     }
 
@@ -1033,7 +1167,32 @@ function App() {
                             type="button"
                             disabled={member.isSaving || member.isDeleting}
                             onClick={() =>
-                              setConfirmDialog({ type: "save", memberId: member.id })
+                              setConfirmDialog({
+                                type: "save",
+                                memberId: member.id,
+                                createMissingMentor:
+                                  member.memberBig.trim().length > 0 &&
+                                  !members.some(
+                                    (currentMember) =>
+                                      currentMember.id !== member.id &&
+                                      currentMember.memberName
+                                        .trim()
+                                        .toLocaleLowerCase() ===
+                                        member.memberBig.trim().toLocaleLowerCase(),
+                                  ),
+                                ...buildSaveSummary(
+                                  member.id,
+                                  member.memberBig.trim().length > 0 &&
+                                    !members.some(
+                                      (currentMember) =>
+                                        currentMember.id !== member.id &&
+                                        currentMember.memberName
+                                          .trim()
+                                          .toLocaleLowerCase() ===
+                                          member.memberBig.trim().toLocaleLowerCase(),
+                                    ),
+                                ),
+                              })
                             }
                           >
                             {member.isSaving ? "Saving…" : "Save"}
@@ -1049,6 +1208,7 @@ function App() {
                                 type: "delete",
                                 memberId: member.id,
                                 memberName: member.memberName,
+                                ...buildDeleteSummary(member.id),
                               })
                             }
                           >
@@ -1256,14 +1416,34 @@ function App() {
       {confirmDialog && (
         <div className="dialog-backdrop" role="presentation">
           <div className="dialog-card" role="dialog" aria-modal="true">
-            <h2>Confirm action</h2>
+            <h2>
+              {confirmDialog.type === "save"
+                ? "Confirm save"
+                : confirmDialog.type === "create-missing-mentor"
+                  ? "Confirm add"
+                  : "Confirm delete"}
+            </h2>
             <p>
               {confirmDialog.type === "save"
-                ? "Save the changes to this row in the database?"
+                ? "Review the changes that will be saved:"
                 : confirmDialog.type === "create-missing-mentor"
-                  ? `${confirmDialog.mentorName} does not exist yet. Add that mentor as a new row too?`
-                : `Delete ${confirmDialog.memberName} from the database?`}
+                  ? `${confirmDialog.mentorName} does not exist yet. Review the new rows that will be created:`
+                : `Review the changes that will happen when ${confirmDialog.memberName} is deleted:`}
             </p>
+            {"summaryLines" in confirmDialog && confirmDialog.summaryLines.length > 0 && (
+              <ul className="dialog-summary">
+                {confirmDialog.summaryLines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            )}
+            {"effectLines" in confirmDialog && confirmDialog.effectLines.length > 0 && (
+              <div className="dialog-effects">
+                {confirmDialog.effectLines.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            )}
             <div className="dialog-actions">
               <button
                 className="choose-button"

@@ -46,6 +46,7 @@ type MemberUpdateRequest = {
   member_big: string | null;
   dynasty: string;
   is_dynasty_head: boolean;
+  create_missing_mentor?: boolean;
 };
 
 type MemberCreateRequest = MemberUpdateRequest & {
@@ -261,28 +262,36 @@ app.patch("/api/members/:id", async (request, response) => {
   }
 
   const normalizedMemberName = updates.member_name.toLocaleLowerCase();
-  const { data: duplicateMembers, error: duplicateMembersError } = await supabase
-    .from(membersTable)
-    .select("id, member_name")
-    .ilike("member_name", updates.member_name);
+  const normalizedCurrentMemberName =
+    currentMember.member_name.toLocaleLowerCase();
 
-  if (duplicateMembersError) {
-    response.status(500).json({ error: duplicateMembersError.message });
-    return;
+  if (normalizedMemberName !== normalizedCurrentMemberName) {
+    const { data: duplicateMembers, error: duplicateMembersError } =
+      await supabase
+        .from(membersTable)
+        .select("id, member_name")
+        .ilike("member_name", updates.member_name);
+
+    if (duplicateMembersError) {
+      response.status(500).json({ error: duplicateMembersError.message });
+      return;
+    }
+
+    const duplicateMember = (duplicateMembers ?? []).find(
+      (member) =>
+        member.id !== memberId &&
+        member.member_name.toLocaleLowerCase() === normalizedMemberName,
+    );
+
+    if (duplicateMember) {
+      response.status(409).json({
+        error: `${updates.member_name} already exists in the database as a member.`,
+      });
+      return;
+    }
   }
 
-  const duplicateMember = (duplicateMembers ?? []).find(
-    (member) =>
-      member.id !== memberId &&
-      member.member_name.toLocaleLowerCase() === normalizedMemberName,
-  );
-
-  if (duplicateMember) {
-    response.status(409).json({
-      error: `${updates.member_name} already exists in the database as a member.`,
-    });
-    return;
-  }
+  let createdMentor: MemberRow | null = null;
 
   if (updates.member_big) {
     if (updates.member_big.toLocaleLowerCase() === normalizedMemberName) {
@@ -309,10 +318,30 @@ app.patch("/api/members/:id", async (request, response) => {
     );
 
     if (!matchingMentor) {
-      response.status(400).json({
-        error: `${updates.member_big} does not exist in the database as a member.`,
-      });
-      return;
+      if (!updates.create_missing_mentor) {
+        response.status(409).json({
+          error: `${updates.member_big} does not exist in the database as a member yet.`,
+          missingMentorName: updates.member_big,
+          requiresMentorConfirmation: true,
+        });
+        return;
+      }
+
+      const { data: createdMentorRows, error: createMentorError } = await supabase
+        .from(membersTable)
+        .insert({
+          member_name: updates.member_big,
+          member_big: null,
+          dynasty: updates.dynasty,
+        })
+        .select("id, created_at, member_name, member_big, dynasty, is_dynasty_head");
+
+      if (createMentorError) {
+        response.status(500).json({ error: createMentorError.message });
+        return;
+      }
+
+      createdMentor = ((createdMentorRows ?? [])[0] ?? null) as MemberRow | null;
     }
   }
 
@@ -342,6 +371,7 @@ app.patch("/api/members/:id", async (request, response) => {
 
   response.json({
     member: data as MemberRow,
+    createdMentor,
   });
 });
 
@@ -617,6 +647,10 @@ function parseMemberUpdateRequest(value: unknown): MemberUpdateRequest | null {
     member_big: memberBig,
     dynasty,
     is_dynasty_head: isDynastyHead,
+    create_missing_mentor:
+      typeof payload.create_missing_mentor === "boolean"
+        ? payload.create_missing_mentor
+        : false,
   };
 }
 

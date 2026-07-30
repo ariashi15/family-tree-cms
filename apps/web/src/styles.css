@@ -744,6 +744,29 @@ tbody tr.skipped-row:hover {
   line-height: 1.5;
 }
 
+.dialog-summary {
+  margin: -0.5rem 0 1.25rem;
+  padding-left: 1.1rem;
+  color: #445046;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.dialog-summary li + li {
+  margin-top: 0.32rem;
+}
+
+.dialog-effects p {
+  margin: 0 0 0.7rem;
+  color: #5f685d;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.dialog-effects p:last-child {
+  margin-bottom: 1.25rem;
+}
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
