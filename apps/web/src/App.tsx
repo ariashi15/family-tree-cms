@@ -96,6 +96,10 @@ type NewMemberForm = {
   isSubmitting: boolean;
 };
 
+type UploadSuccessDialogState = {
+  message: string;
+} | null;
+
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} bytes`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -203,6 +207,8 @@ function App() {
   const [pairings, setPairings] = useState<Pairing[]>([]);
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccessMessage, setUploadSuccessMessage] = useState("");
+  const [uploadSuccessDialog, setUploadSuccessDialog] =
+    useState<UploadSuccessDialogState>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isReading, setIsReading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -243,6 +249,7 @@ function App() {
   const selectFile = async (file?: File) => {
     setUploadError("");
     setUploadSuccessMessage("");
+    setUploadSuccessDialog(null);
     setPairings([]);
 
     if (!file) return;
@@ -352,6 +359,7 @@ function App() {
     setPairings([]);
     setUploadError("");
     setUploadSuccessMessage("");
+    setUploadSuccessDialog(null);
 
     if (inputRef.current) {
       inputRef.current.value = "";
@@ -376,6 +384,7 @@ function App() {
     setIsUploading(true);
     setUploadError("");
     setUploadSuccessMessage("");
+    setUploadSuccessDialog(null);
 
     try {
       const response = await fetch(`${apiUrl}/api/pairings/import`, {
@@ -432,9 +441,10 @@ function App() {
         }),
       );
 
-      setUploadSuccessMessage(
-        `${successPayload.insertedCount} ${successPayload.insertedCount === 1 ? "member was" : "members were"} inserted into the database.${successPayload.skippedCount ? ` ${successPayload.skippedCount} ${successPayload.skippedCount === 1 ? "existing person was" : "existing people were"} skipped.` : ""}`,
-      );
+      const successMessage = `${successPayload.insertedCount} ${successPayload.insertedCount === 1 ? "member was" : "members were"} inserted into the database.${successPayload.skippedCount ? ` ${successPayload.skippedCount} ${successPayload.skippedCount === 1 ? "existing person was" : "existing people were"} skipped.` : ""}`;
+
+      setUploadSuccessMessage(successMessage);
+      setUploadSuccessDialog({ message: successMessage });
       await loadMembers();
     } catch {
       setUploadError("The upload could not be completed. Please check the API connection.");
@@ -1116,12 +1126,6 @@ function App() {
                 </p>
               )}
 
-              {uploadSuccessMessage && (
-                <p className="success-message" role="status">
-                  {uploadSuccessMessage}
-                </p>
-              )}
-
               <div className="format-guide">
                 <h3>Required format</h3>
                 <p>
@@ -1269,6 +1273,24 @@ function App() {
               </button>
               <button className="continue-button" type="button" onClick={() => void confirmAction()}>
                 Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {uploadSuccessDialog && (
+        <div className="dialog-backdrop" role="presentation">
+          <div className="dialog-card" role="dialog" aria-modal="true">
+            <h2>Upload complete</h2>
+            <p>{uploadSuccessDialog.message}</p>
+            <div className="dialog-actions">
+              <button
+                className="continue-button"
+                type="button"
+                onClick={() => setUploadSuccessDialog(null)}
+              >
+                Close
               </button>
             </div>
           </div>
