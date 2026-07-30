@@ -570,7 +570,7 @@ table {
 
 th,
 td {
-  padding: 0.95rem 2rem;
+  padding: 0.75rem 2rem;
   border-bottom: 1px solid #eceee8;
 }
 
@@ -586,7 +586,17 @@ th {
 td {
   color: #333a31;
   font-size: 0.88rem;
-  vertical-align: top;
+  vertical-align: middle;
+}
+
+.member-name-cell {
+  color: #111612;
+  font-weight: 600;
+}
+
+.member-name-cell,
+.member-big-cell {
+  white-space: nowrap;
 }
 
 tbody tr:last-child td {
@@ -631,13 +641,62 @@ tbody tr.skipped-row:hover {
 
 .dynasty-pill {
   display: inline-flex;
-  padding: 0.28rem 0.55rem;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0 0.9rem;
   border: 1px solid #d7ded3;
   border-radius: 999px;
   color: #49614d;
   background: #f4f7f1;
   font-size: 0.75rem;
   font-weight: 650;
+}
+
+.dynasty-pill-fire {
+  border-color: #e4b8b5;
+  color: #9b2f2f;
+  background: #fff0ee;
+}
+
+.dynasty-pill-wind {
+  border-color: #e6d28b;
+  color: #8b6812;
+  background: #fff7d6;
+}
+
+.dynasty-pill-earth {
+  border-color: #bfd6b8;
+  color: #356442;
+  background: #eef8ec;
+}
+
+.dynasty-pill-water {
+  border-color: #b7cfe6;
+  color: #2b5f96;
+  background: #eef6ff;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0 0.9rem;
+  border: 1px solid #d7ded3;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.status-pill-yes {
+  border-color: #a58bcc;
+  color: #4f2b86;
+  background: #ebe0fb;
+}
+
+.status-pill-no {
+  border-color: #ced3d8;
+  color: #5f6770;
+  background: #f4f6f8;
 }
 
 .cell-input,
@@ -651,61 +710,25 @@ tbody tr.skipped-row:hover {
   background: #fcfdfb;
 }
 
-.cell-input-member-name {
-  color: #111612;
-  font-weight: 600;
-  background: #f2f5ef;
-}
-
 .cell-input:focus,
 .cell-select:focus {
   outline: 2px solid #bdd3c0;
   outline-offset: 1px;
 }
 
-.cell-select-dynasty-fire {
-  border-color: #e4b8b5;
-  color: #9b2f2f;
-  background: #fff0ee;
-}
-
-.cell-select-dynasty-wind {
-  border-color: #e6d28b;
-  color: #8b6812;
-  background: #fff7d6;
-}
-
-.cell-select-dynasty-earth {
-  border-color: #bfd6b8;
-  color: #356442;
-  background: #eef8ec;
-}
-
-.cell-select-dynasty-water {
-  border-color: #b7cfe6;
-  color: #2b5f96;
-  background: #eef6ff;
-}
-
-.cell-select-dynasty-head-true {
-  border-color: #d4c0eb;
-  color: #6c43a6;
-  background: #f5effd;
-}
-
-.cell-select-dynasty-head-false {
-  border-color: #ced3d8;
-  color: #5f6770;
-  background: #f4f6f8;
-}
-
 .row-action {
-  border: 1px solid #c6d1c4;
+  border: 1px solid #385a42;
   border-radius: 0.55rem;
-  padding: 0.66rem 0.9rem;
-  color: #31533a;
-  background: #f7faf6;
+  padding: 0.42rem 0.72rem;
+  color: #ffffff;
+  background: #385a42;
+  font-size: 0.8rem;
   font-weight: 700;
+}
+
+.row-action-edit {
+  border-color: #28578d;
+  background: #28578d;
 }
 
 .row-action:disabled {
@@ -714,9 +737,9 @@ tbody tr.skipped-row:hover {
 }
 
 .row-action-danger {
-  color: #8c3831;
-  border-color: #e3c0bc;
-  background: #fff4f2;
+  color: #ffffff;
+  border-color: #385a42;
+  background: #385a42;
 }
 
 .validation-cell {
@@ -775,6 +798,10 @@ tbody tr.skipped-row:hover {
   box-shadow: 0 1.5rem 4rem rgba(30, 44, 34, 0.2);
 }
 
+.dialog-card-wide {
+  width: min(100%, 54rem);
+}
+
 .dialog-card h2 {
   margin-bottom: 0.65rem;
   font-size: 1.2rem;
@@ -813,6 +840,13 @@ tbody tr.skipped-row:hover {
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
+}
+
+.edit-dialog-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1rem;
 }
 
 .visually-hidden {
@@ -895,5 +929,9 @@ tbody tr.skipped-row:hover {
 
   .dialog-actions {
     flex-direction: column-reverse;
+  }
+
+  .edit-dialog-grid {
+    grid-template-columns: 1fr;
   }
 }

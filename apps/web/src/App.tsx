@@ -94,6 +94,15 @@ type ConfirmDialogState =
     }
   | null;
 
+type EditDialogState = {
+  memberId: string;
+  memberName: string;
+  memberBig: string;
+  dynasty: (typeof allowedDynasties)[number];
+  isDynastyHead: "true" | "false";
+  rowError: string;
+} | null;
+
 type NewMemberForm = {
   memberName: string;
   memberBig: string;
@@ -206,12 +215,16 @@ function formatDynasty(value: string) {
   return value ? value[0].toUpperCase() + value.slice(1) : value;
 }
 
+function getDynastyBadgeClass(dynasty: string) {
+  return `dynasty-pill dynasty-pill-${dynasty}`;
+}
+
 function getDynastySelectClass(dynasty: string) {
-  return `cell-select cell-select-dynasty cell-select-dynasty-${dynasty}`;
+  return "cell-select";
 }
 
 function getDynastyHeadSelectClass(value: "true" | "false") {
-  return `cell-select cell-select-dynasty-head cell-select-dynasty-head-${value}`;
+  return "cell-select";
 }
 
 function App() {
@@ -223,6 +236,7 @@ function App() {
   const [membersSuccess, setMembersSuccess] = useState("");
   const [isMembersLoading, setIsMembersLoading] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
+  const [editDialog, setEditDialog] = useState<EditDialogState>(null);
   const [memberSearchQuery, setMemberSearchQuery] = useState("");
   const [memberSnapshots, setMemberSnapshots] = useState<Record<string, MemberSnapshot>>(
     {},
@@ -506,16 +520,13 @@ function App() {
   };
 
   const updateMemberField = (
-    memberId: string,
     field: "memberName" | "memberBig" | "dynasty" | "isDynastyHead",
     value: string,
   ) => {
-    setMembers((currentMembers) =>
-      currentMembers.map((member) =>
-        member.id === memberId
-          ? { ...member, [field]: value, rowError: "" }
-          : member,
-      ),
+    setEditDialog((currentDialog) =>
+      currentDialog
+        ? { ...currentDialog, [field]: value, rowError: "" }
+        : currentDialog,
     );
     setMembersError("");
     setMembersSuccess("");
@@ -545,8 +556,32 @@ function App() {
     });
   };
 
+  const openEditDialog = (memberId: string) => {
+    const member = members.find((currentMember) => currentMember.id === memberId);
+
+    if (!member) return;
+
+    setEditDialog({
+      memberId: member.id,
+      memberName: member.memberName,
+      memberBig: member.memberBig,
+      dynasty: member.dynasty,
+      isDynastyHead: member.isDynastyHead,
+      rowError: "",
+    });
+  };
+
   const buildSaveSummary = (memberId: string, createMissingMentor: boolean) => {
-    const current = members.find((member) => member.id === memberId);
+    const current =
+      editDialog && editDialog.memberId === memberId
+        ? {
+            id: editDialog.memberId,
+            memberName: editDialog.memberName,
+            memberBig: editDialog.memberBig,
+            dynasty: editDialog.dynasty,
+            isDynastyHead: editDialog.isDynastyHead,
+          }
+        : members.find((member) => member.id === memberId);
     const original = memberSnapshots[memberId];
 
     if (!current || !original) return { summaryLines: [], effectLines: [] };
@@ -756,7 +791,16 @@ function App() {
   };
 
   const saveMember = async (memberId: string, createMissingMentor = false) => {
-    const target = members.find((member) => member.id === memberId);
+    const target =
+      editDialog && editDialog.memberId === memberId
+        ? {
+            id: editDialog.memberId,
+            memberName: editDialog.memberName,
+            memberBig: editDialog.memberBig,
+            dynasty: editDialog.dynasty,
+            isDynastyHead: editDialog.isDynastyHead,
+          }
+        : members.find((member) => member.id === memberId);
 
     if (!target) return;
 
@@ -777,10 +821,8 @@ function App() {
     }
 
     if (rowError) {
-      setMembers((currentMembers) =>
-        currentMembers.map((member) =>
-          member.id === memberId ? { ...member, rowError } : member,
-        ),
+      setEditDialog((currentDialog) =>
+        currentDialog ? { ...currentDialog, rowError } : currentDialog,
       );
       setMembersError(rowError);
       return;
@@ -841,10 +883,8 @@ function App() {
             ? payload.error
             : "The member could not be updated.";
 
-        setMembers((currentMembers) =>
-          currentMembers.map((member) =>
-            member.id === memberId ? { ...member, rowError } : member,
-          ),
+        setEditDialog((currentDialog) =>
+          currentDialog ? { ...currentDialog, rowError } : currentDialog,
         );
         setMembersError(rowError);
         return;
@@ -858,6 +898,7 @@ function App() {
             : member,
         ),
       );
+      setEditDialog(null);
       await loadMembers();
     } catch {
       setMembersError("The member could not be updated. Please check the API connection.");
@@ -922,6 +963,55 @@ function App() {
     await deleteMember(currentDialog.memberId);
   };
 
+  const beginEditSaveFlow = () => {
+    if (!editDialog) return;
+
+    const trimmedMemberName = editDialog.memberName.trim();
+    const trimmedMemberBig = editDialog.memberBig.trim();
+    let rowError = "";
+
+    if (!trimmedMemberName) {
+      rowError = "Member name is required.";
+    } else if (!allowedDynasties.includes(editDialog.dynasty)) {
+      rowError = "Dynasty must be fire, water, earth, or wind.";
+    } else if (
+      trimmedMemberBig &&
+      trimmedMemberBig.toLocaleLowerCase() === trimmedMemberName.toLocaleLowerCase()
+    ) {
+      rowError = "A member cannot list themself as their own mentor.";
+    }
+
+    if (rowError) {
+      setEditDialog((currentDialog) =>
+        currentDialog ? { ...currentDialog, rowError } : currentDialog,
+      );
+      setMembersError(rowError);
+      return;
+    }
+
+    const createMissingMentor =
+      trimmedMemberBig.length > 0 &&
+      !members.some(
+        (member) =>
+          member.id !== editDialog.memberId &&
+          member.memberName.trim().toLocaleLowerCase() ===
+            trimmedMemberBig.toLocaleLowerCase(),
+      );
+
+    const { summaryLines, effectLines } = buildSaveSummary(
+      editDialog.memberId,
+      createMissingMentor,
+    );
+
+    setConfirmDialog({
+      type: "save",
+      memberId: editDialog.memberId,
+      createMissingMentor,
+      summaryLines,
+      effectLines,
+    });
+  };
+
   return (
     <div className="app-shell">
       <header className="site-header">
@@ -971,11 +1061,9 @@ function App() {
               <strong>Editing rules</strong>
               <ul>
                 <li><span className="inline-code-label">Member Name</span> is required and must be unique.</li>
-                <li><span className="inline-code-label">Big</span> is optional, but if you set it, that mentor must already exist.</li>
-                <li>A member cannot list themself as their own mentor.</li>
-                <li>When you rename a member, any mentees linked to that member are updated automatically.</li>
-                <li>When you delete a mentor, affected <span className="inline-code-label">Big</span> values are cleared to <span className="inline-code-label">null</span> automatically.</li>
-                <li>Adding a member with a missing mentor will prompt you to confirm creating that mentor too.</li>
+                <li><span className="inline-code-label">Big</span> is optional; if you set it, a row for that big will also be created if it doesn't already exist.</li>
+                <li>Renaming someone automatically updates their name in rows where they're someone's big as well.</li>
+                <li>When you delete a big, affected littles get their bigs cleared to <span className="inline-code-label">null</span> automatically.</li>
               </ul>
             </div>
 
@@ -1113,101 +1201,35 @@ function App() {
                       <th scope="col">Big</th>
                       <th scope="col">Dynasty</th>
                       <th scope="col">Dynasty Head</th>
-                      <th scope="col">Save</th>
+                      <th scope="col">Edit</th>
                       <th scope="col">Delete</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredMembers.map((member) => (
                       <tr key={member.id}>
+                        <td className="member-name-cell">{member.memberName}</td>
+                        <td className="member-big-cell">{member.memberBig || "None"}</td>
                         <td>
-                          <input
-                            className="cell-input cell-input-member-name"
-                            type="text"
-                            value={member.memberName}
-                            onChange={(event) =>
-                              updateMemberField(member.id, "memberName", event.target.value)
-                            }
-                          />
-                          {member.rowError && <p className="row-error">{member.rowError}</p>}
+                          <span className={getDynastyBadgeClass(member.dynasty)}>
+                            {formatDynasty(member.dynasty)}
+                          </span>
                         </td>
                         <td>
-                          <input
-                            className="cell-input"
-                            type="text"
-                            value={member.memberBig}
-                            placeholder="None"
-                            onChange={(event) =>
-                              updateMemberField(member.id, "memberBig", event.target.value)
-                            }
-                          />
-                        </td>
-                        <td>
-                          <select
-                            className={getDynastySelectClass(member.dynasty)}
-                            value={member.dynasty}
-                            onChange={(event) =>
-                              updateMemberField(member.id, "dynasty", event.target.value)
-                            }
+                          <span
+                            className={`status-pill status-pill-${member.isDynastyHead === "true" ? "yes" : "no"}`}
                           >
-                            {allowedDynasties.map((dynasty) => (
-                              <option key={dynasty} value={dynasty}>
-                                {formatDynasty(dynasty)}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td>
-                          <select
-                            className={getDynastyHeadSelectClass(member.isDynastyHead)}
-                            value={member.isDynastyHead}
-                            onChange={(event) =>
-                              updateMemberField(
-                                member.id,
-                                "isDynastyHead",
-                                event.target.value,
-                              )
-                            }
-                          >
-                            <option value="false">No</option>
-                            <option value="true">Yes</option>
-                          </select>
+                            {formatBool(member.isDynastyHead)}
+                          </span>
                         </td>
                         <td>
                           <button
-                            className="row-action"
+                            className="row-action row-action-edit"
                             type="button"
                             disabled={member.isSaving || member.isDeleting}
-                            onClick={() =>
-                              setConfirmDialog({
-                                type: "save",
-                                memberId: member.id,
-                                createMissingMentor:
-                                  member.memberBig.trim().length > 0 &&
-                                  !members.some(
-                                    (currentMember) =>
-                                      currentMember.id !== member.id &&
-                                      currentMember.memberName
-                                        .trim()
-                                        .toLocaleLowerCase() ===
-                                        member.memberBig.trim().toLocaleLowerCase(),
-                                  ),
-                                ...buildSaveSummary(
-                                  member.id,
-                                  member.memberBig.trim().length > 0 &&
-                                    !members.some(
-                                      (currentMember) =>
-                                        currentMember.id !== member.id &&
-                                        currentMember.memberName
-                                          .trim()
-                                          .toLocaleLowerCase() ===
-                                          member.memberBig.trim().toLocaleLowerCase(),
-                                    ),
-                                ),
-                              })
-                            }
+                            onClick={() => openEditDialog(member.id)}
                           >
-                            {member.isSaving ? "Saving…" : "Save"}
+                            Edit
                           </button>
                         </td>
                         <td>
@@ -1466,6 +1488,85 @@ function App() {
               </button>
               <button className="continue-button" type="button" onClick={() => void confirmAction()}>
                 Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!confirmDialog && editDialog && (
+        <div className="dialog-backdrop" role="presentation">
+          <div className="dialog-card dialog-card-wide" role="dialog" aria-modal="true">
+            <h2>Edit member</h2>
+            <p>Update the fields below, then review the changes before saving.</p>
+            <div className="edit-dialog-grid">
+              <label className="field-group">
+                <span>Member Name</span>
+                <input
+                  className="cell-input"
+                  type="text"
+                  value={editDialog.memberName}
+                  onChange={(event) =>
+                    updateMemberField("memberName", event.target.value)
+                  }
+                />
+              </label>
+
+              <label className="field-group">
+                <span>Big</span>
+                <input
+                  className="cell-input"
+                  type="text"
+                  placeholder="None"
+                  value={editDialog.memberBig}
+                  onChange={(event) =>
+                    updateMemberField("memberBig", event.target.value)
+                  }
+                />
+              </label>
+
+              <label className="field-group">
+                <span>Dynasty</span>
+                <select
+                  className={getDynastySelectClass(editDialog.dynasty)}
+                  value={editDialog.dynasty}
+                  onChange={(event) =>
+                    updateMemberField("dynasty", event.target.value)
+                  }
+                >
+                  {allowedDynasties.map((dynasty) => (
+                    <option key={dynasty} value={dynasty}>
+                      {formatDynasty(dynasty)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field-group">
+                <span>Dynasty Head</span>
+                <select
+                  className={getDynastyHeadSelectClass(editDialog.isDynastyHead)}
+                  value={editDialog.isDynastyHead}
+                  onChange={(event) =>
+                    updateMemberField("isDynastyHead", event.target.value)
+                  }
+                >
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
+                </select>
+              </label>
+            </div>
+            {editDialog.rowError && <p className="row-error">{editDialog.rowError}</p>}
+            <div className="dialog-actions">
+              <button
+                className="choose-button"
+                type="button"
+                onClick={() => setEditDialog(null)}
+              >
+                Cancel
+              </button>
+              <button className="continue-button" type="button" onClick={beginEditSaveFlow}>
+                Review changes
               </button>
             </div>
           </div>
