@@ -317,6 +317,11 @@ h1 {
   border-top: 1px solid #daddd5;
 }
 
+.relationship-note code {
+  color: #3d5943;
+  font-weight: 700;
+}
+
 .card-footer {
   display: flex;
   align-items: center;
@@ -386,6 +391,24 @@ h1 {
   font-weight: 750;
 }
 
+.validation-summary {
+  display: flex;
+  gap: 0.3rem;
+  padding: 0.9rem 2rem;
+  border-bottom: 1px solid #e6b8b3;
+  color: #85352f;
+  background: #fff0ee;
+  flex-direction: column;
+}
+
+.validation-summary strong {
+  font-size: 0.85rem;
+}
+
+.validation-summary span {
+  font-size: 0.8rem;
+}
+
 .table-scroll {
   overflow-x: auto;
 }
@@ -424,6 +447,22 @@ tbody tr:hover {
   background: #fafcf8;
 }
 
+tbody tr.invalid-row,
+tbody tr.invalid-row:hover {
+  background: #fff0ee;
+}
+
+.invalid-row td {
+  border-bottom-color: #efc7c2;
+  color: #702f2a;
+}
+
+.invalid-row .dynasty-pill {
+  border-color: #dda9a3;
+  color: #8c3831;
+  background: #ffe1de;
+}
+
 .dynasty-pill {
   display: inline-flex;
   padding: 0.28rem 0.55rem;
@@ -433,6 +472,28 @@ tbody tr:hover {
   background: #f4f7f1;
   font-size: 0.75rem;
   font-weight: 650;
+}
+
+.validation-cell {
+  min-width: 15rem;
+}
+
+.validation-cell ul {
+  margin: 0;
+  padding-left: 1rem;
+  color: #9a3932;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.validation-cell li + li {
+  margin-top: 0.3rem;
+}
+
+.valid-label {
+  color: #52705a;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .visually-hidden {
@@ -456,7 +517,8 @@ tbody tr:hover {
 
   .card-heading,
   .card-footer,
-  .preview-heading {
+  .preview-heading,
+  .validation-summary {
     padding-right: 1.25rem;
     padding-left: 1.25rem;
   }

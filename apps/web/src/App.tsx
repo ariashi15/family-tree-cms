@@ -2,11 +2,14 @@ import { useRef, useState } from "react";
 import type { DragEvent } from "react";
 
 const expectedColumns = ["mentor_name", "mentee_name", "dynasty"];
+const allowedDynasties = new Set(["fire", "water", "earth", "wind"]);
 
 type Pairing = {
   mentorName: string;
   menteeName: string;
   dynasty: string;
+  rowNumber: number;
+  errors: string[];
 };
 
 function formatFileSize(bytes: number) {
@@ -105,34 +108,51 @@ function App() {
         );
       }
 
-      const seenMentees = new Map<string, number>();
       const mappedPairings = parsedRows.slice(1).map((row, index) => {
-        const lineNumber = index + 2;
+        const rowNumber = index + 2;
+        const errors: string[] = [];
 
         if (row.length !== expectedColumns.length) {
-          throw new Error(
-            `Row ${lineNumber} has ${row.length} columns; expected 3.`,
+          errors.push(
+            `This row has ${row.length} columns; exactly 3 are required.`,
           );
         }
 
-        const [mentorName, menteeName, dynasty] = row;
+        const [mentorName = "", menteeName = "", dynasty = ""] = row;
 
         if (!mentorName || !menteeName || !dynasty) {
-          throw new Error(`Row ${lineNumber} contains an empty required value.`);
+          errors.push("Mentor, mentee, and dynasty are all required.");
         }
 
-        const menteeKey = menteeName.toLocaleLowerCase();
-        const previousLine = seenMentees.get(menteeKey);
-
-        if (previousLine) {
-          throw new Error(
-            `${menteeName} appears as a mentee on rows ${previousLine} and ${lineNumber}. Each mentee may appear only once.`,
+        if (dynasty && !allowedDynasties.has(dynasty)) {
+          errors.push(
+            `"${dynasty}" is not a valid dynasty. Use fire, water, earth, or wind.`,
           );
         }
 
-        seenMentees.set(menteeKey, lineNumber);
+        return { mentorName, menteeName, dynasty, rowNumber, errors };
+      });
 
-        return { mentorName, menteeName, dynasty };
+      const menteeRows = new Map<string, Pairing[]>();
+
+      mappedPairings.forEach((pairing) => {
+        if (!pairing.menteeName) return;
+        const key = pairing.menteeName.toLocaleLowerCase();
+        menteeRows.set(key, [...(menteeRows.get(key) ?? []), pairing]);
+      });
+
+      menteeRows.forEach((duplicates) => {
+        if (duplicates.length < 2) return;
+
+        const rowNumbers = duplicates
+          .map((pairing) => pairing.rowNumber)
+          .join(", ");
+
+        duplicates.forEach((pairing) => {
+          pairing.errors.push(
+            `${pairing.menteeName} appears on rows ${rowNumbers}. Each mentee may appear only once.`,
+          );
+        });
       });
 
       setPairings(mappedPairings);
@@ -162,6 +182,12 @@ function App() {
       inputRef.current.value = "";
     }
   };
+
+  const invalidPairings = pairings.filter(
+    (pairing) => pairing.errors.length > 0,
+  );
+  const canUpload =
+    pairings.length > 0 && invalidPairings.length === 0 && !isReading;
 
   return (
     <div className="app-shell">
@@ -260,8 +286,9 @@ function App() {
               ))}
             </div>
             <p className="relationship-note">
-              A mentor may appear in multiple rows. Each mentee should appear
-              only once.
+              Dynasties must be <code>fire</code>, <code>water</code>,{" "}
+              <code>earth</code>, or <code>wind</code>. A mentor may appear in
+              multiple rows. Each mentee should appear only once.
             </p>
           </div>
 
@@ -270,10 +297,16 @@ function App() {
               {isReading
                 ? "Reading your file…"
                 : pairings.length
-                  ? `${pairings.length} valid ${pairings.length === 1 ? "pairing" : "pairings"} ready to upload.`
+                  ? invalidPairings.length
+                    ? `${invalidPairings.length} ${invalidPairings.length === 1 ? "row needs" : "rows need"} attention before upload.`
+                    : `${pairings.length} valid ${pairings.length === 1 ? "pairing" : "pairings"} ready to upload.`
                   : "Select a file to preview its contents."}
             </p>
-            <button className="continue-button" type="button" disabled>
+            <button
+              className="continue-button"
+              type="button"
+              disabled={!canUpload}
+            >
               Upload pairings
             </button>
           </div>
@@ -287,9 +320,21 @@ function App() {
                 <h2 id="preview-heading">Review your pairings</h2>
               </div>
               <span className="row-count">
-                {pairings.length} {pairings.length === 1 ? "row" : "rows"}
+                {invalidPairings.length
+                  ? `${invalidPairings.length} invalid`
+                  : `${pairings.length} ${pairings.length === 1 ? "row" : "rows"}`}
               </span>
             </div>
+
+            {invalidPairings.length > 0 && (
+              <div className="validation-summary" role="alert">
+                <strong>Some rows need attention</strong>
+                <span>
+                  Fix the highlighted rows in your CSV, then upload the file
+                  again.
+                </span>
+              </div>
+            )}
 
             <div className="table-scroll">
               <table>
@@ -298,17 +343,30 @@ function App() {
                     <th scope="col">Mentor</th>
                     <th scope="col">Mentee</th>
                     <th scope="col">Dynasty</th>
+                    <th scope="col">Validation</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pairings.map((pairing, index) => (
                     <tr
                       key={`${pairing.menteeName}-${pairing.mentorName}-${index}`}
+                      className={pairing.errors.length ? "invalid-row" : ""}
                     >
                       <td>{pairing.mentorName}</td>
                       <td>{pairing.menteeName}</td>
                       <td>
                         <span className="dynasty-pill">{pairing.dynasty}</span>
+                      </td>
+                      <td className="validation-cell">
+                        {pairing.errors.length ? (
+                          <ul>
+                            {pairing.errors.map((rowError) => (
+                              <li key={rowError}>{rowError}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="valid-label">Valid</span>
+                        )}
                       </td>
                     </tr>
                   ))}
