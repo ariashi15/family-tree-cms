@@ -263,6 +263,12 @@ h1 {
   font-size: 0.88rem;
 }
 
+.success-message {
+  margin: -0.5rem 2rem 1.5rem;
+  color: #2b6a47;
+  font-size: 0.88rem;
+}
+
 .format-guide {
   margin: 0 2rem 2rem;
   padding: 1.35rem 1.5rem;
@@ -452,15 +458,31 @@ tbody tr.invalid-row:hover {
   background: #fff0ee;
 }
 
+tbody tr.skipped-row,
+tbody tr.skipped-row:hover {
+  background: #fff8e8;
+}
+
 .invalid-row td {
   border-bottom-color: #efc7c2;
   color: #702f2a;
+}
+
+.skipped-row td {
+  border-bottom-color: #ebd5a2;
+  color: #755316;
 }
 
 .invalid-row .dynasty-pill {
   border-color: #dda9a3;
   color: #8c3831;
   background: #ffe1de;
+}
+
+.skipped-row .dynasty-pill {
+  border-color: #e7c978;
+  color: #8a651b;
+  background: #fff1c8;
 }
 
 .dynasty-pill {
@@ -490,8 +512,18 @@ tbody tr.invalid-row:hover {
   margin-top: 0.3rem;
 }
 
+.notice-list {
+  color: #8a651b;
+}
+
 .valid-label {
   color: #52705a;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.uploaded-label {
+  color: #2b6a47;
   font-size: 0.76rem;
   font-weight: 700;
 }

@@ -13,6 +13,19 @@ type PairingImportRequest = {
   pairings: PairingImportRow[];
 };
 
+type ImportConflict = {
+  rowNumber: number;
+  memberName: string;
+  role: "mentor" | "mentee";
+  message: string;
+};
+
+type PairingImportResult = {
+  rowNumber: number;
+  inserted: boolean;
+  skipped: ImportConflict[];
+};
+
 type MemberRow = {
   id: string;
   created_at: string;
@@ -119,9 +132,46 @@ app.post("/api/pairings/import", async (request, response) => {
   const existingNames = new Set(
     (existingMembers ?? []).map((member) => member.member_name),
   );
+
+  const conflicts: ImportConflict[] = [];
+  const resultsByRow = new Map<number, PairingImportResult>();
+
+  pairings.forEach((pairing, index) => {
+    const rowNumber = index + 2;
+    const skipped: ImportConflict[] = [];
+
+    if (existingNames.has(pairing.mentor_name)) {
+      skipped.push({
+        rowNumber,
+        memberName: pairing.mentor_name,
+        role: "mentor",
+        message: `${pairing.mentor_name} already exists in the database as a member.`,
+      });
+    }
+
+    if (existingNames.has(pairing.mentee_name)) {
+      skipped.push({
+        rowNumber,
+        memberName: pairing.mentee_name,
+        role: "mentee",
+        message: `${pairing.mentee_name} already exists in the database as a member.`,
+      });
+    }
+
+    skipped.forEach((conflict) => conflicts.push(conflict));
+    resultsByRow.set(rowNumber, {
+      rowNumber,
+      inserted: false,
+      skipped,
+    });
+  });
+
   const pendingInserts = new Map<string, MemberInsert>();
 
-  pairings.forEach((pairing) => {
+  pairings.forEach((pairing, index) => {
+    const rowNumber = index + 2;
+    let rowInserted = false;
+
     if (
       !existingNames.has(pairing.mentor_name) &&
       !pendingInserts.has(pairing.mentor_name)
@@ -131,6 +181,7 @@ app.post("/api/pairings/import", async (request, response) => {
         member_big: null,
         dynasty: pairing.dynasty,
       });
+      rowInserted = true;
     }
 
     if (
@@ -142,6 +193,13 @@ app.post("/api/pairings/import", async (request, response) => {
         member_big: pairing.mentor_name,
         dynasty: pairing.dynasty,
       });
+      rowInserted = true;
+    }
+
+    const currentResult = resultsByRow.get(rowNumber);
+
+    if (currentResult) {
+      currentResult.inserted = rowInserted;
     }
   });
 
@@ -151,7 +209,8 @@ app.post("/api/pairings/import", async (request, response) => {
     response.json({
       insertedCount: 0,
       insertedMembers: [],
-      skippedExistingCount: existingNames.size,
+      skippedCount: conflicts.length,
+      results: [...resultsByRow.values()],
     });
     return;
   }
@@ -169,7 +228,8 @@ app.post("/api/pairings/import", async (request, response) => {
   response.status(201).json({
     insertedCount: inserts.length,
     insertedMembers: (insertedMembers ?? []) as MemberRow[],
-    skippedExistingCount: existingNames.size,
+    skippedCount: conflicts.length,
+    results: [...resultsByRow.values()],
   });
 });
 

@@ -51,8 +51,8 @@ SUPABASE_SECRET_KEY=your-secret-key
 SUPABASE_MEMBERS_TABLE=members
 ```
 
-Use the Supabase service role key on the API only. Do not place it in the
-frontend `.env` file.
+Use the Supabase secret key on the API only. Do not place it in the frontend
+`.env` file.
 
 ## Development
 
@@ -93,11 +93,15 @@ The backend currently exposes these endpoints:
 
 Import behavior:
 
-- If a mentor already exists as `member_name`, no new mentor row is inserted.
-- If a mentee already exists as `member_name`, no new mentee row is inserted.
+- If a mentor already exists as `member_name`, that person is skipped and
+  reported back to the CMS.
+- If a mentee already exists as `member_name`, that person is skipped and
+  reported back to the CMS.
 - If a mentor is missing, a row is created with `member_big` set to `null`.
 - If a mentee is missing, a row is created with `member_big` set to the
   pairing's mentor name.
+- A pairing can partially succeed. For example, an existing mentor can be
+  skipped while a new mentee from the same row is still inserted.
 
 ## Build and production start
 

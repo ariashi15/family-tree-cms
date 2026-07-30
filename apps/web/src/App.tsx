@@ -3,6 +3,10 @@ import type { DragEvent } from "react";
 
 const expectedColumns = ["mentor_name", "mentee_name", "dynasty"];
 const allowedDynasties = new Set(["fire", "water", "earth", "wind"]);
+const apiUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3000").replace(
+  /\/$/,
+  "",
+);
 
 type Pairing = {
   mentorName: string;
@@ -10,6 +14,29 @@ type Pairing = {
   dynasty: string;
   rowNumber: number;
   errors: string[];
+  notices: string[];
+  uploadState: "pending" | "uploaded" | "uploaded-with-skips" | "skipped";
+};
+
+type ImportConflict = {
+  rowNumber: number;
+  memberName: string;
+  role: "mentor" | "mentee";
+  message: string;
+};
+
+type ImportSuccessResponse = {
+  insertedCount: number;
+  skippedCount: number;
+  results: {
+    rowNumber: number;
+    inserted: boolean;
+    skipped: ImportConflict[];
+  }[];
+};
+
+type ApiErrorResponse = {
+  error?: string;
 };
 
 function formatFileSize(bytes: number) {
@@ -72,9 +99,12 @@ function App() {
   const [error, setError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isReading, setIsReading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   const selectFile = async (file?: File) => {
     setError("");
+    setSuccessMessage("");
     setPairings([]);
 
     if (!file) return;
@@ -130,7 +160,15 @@ function App() {
           );
         }
 
-        return { mentorName, menteeName, dynasty, rowNumber, errors };
+        return {
+          mentorName,
+          menteeName,
+          dynasty,
+          rowNumber,
+          errors,
+          notices: [],
+          uploadState: "pending" as const,
+        };
       });
 
       const menteeRows = new Map<string, Pairing[]>();
@@ -177,9 +215,85 @@ function App() {
     setSelectedFile(null);
     setPairings([]);
     setError("");
+    setSuccessMessage("");
 
     if (inputRef.current) {
       inputRef.current.value = "";
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!canUpload) return;
+
+    setIsUploading(true);
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      const response = await fetch(`${apiUrl}/api/pairings/import`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          pairings: pairings.map((pairing) => ({
+            mentor_name: pairing.mentorName,
+            mentee_name: pairing.menteeName,
+            dynasty: pairing.dynasty,
+          })),
+        }),
+      });
+
+      const payload = (await response.json()) as
+        | ImportSuccessResponse
+        | ApiErrorResponse;
+
+      if (!response.ok) {
+        setError(
+          "error" in payload && payload.error
+            ? payload.error
+            : "The upload could not be completed. Please try again.",
+        );
+        return;
+      }
+
+      const successPayload = payload as ImportSuccessResponse;
+
+      const resultsByRow = new Map(
+        successPayload.results.map((result) => [result.rowNumber, result]),
+      );
+
+      setPairings((currentPairings) =>
+        currentPairings.map((pairing) => {
+          const result = resultsByRow.get(pairing.rowNumber);
+
+          if (!result) {
+            return pairing;
+          }
+
+          const notices = result.skipped.map((conflict) => conflict.message);
+          const uploadState =
+            result.inserted && notices.length > 0
+              ? "uploaded-with-skips"
+              : result.inserted
+                ? "uploaded"
+                : "skipped";
+
+          return {
+            ...pairing,
+            notices,
+            uploadState,
+          };
+        }),
+      );
+
+      setSuccessMessage(
+        `${successPayload.insertedCount} ${successPayload.insertedCount === 1 ? "member was" : "members were"} inserted into the database.${successPayload.skippedCount ? ` ${successPayload.skippedCount} ${successPayload.skippedCount === 1 ? "existing person was" : "existing people were"} skipped.` : ""}`,
+      );
+    } catch {
+      setError("The upload could not be completed. Please check the API connection.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -187,7 +301,10 @@ function App() {
     (pairing) => pairing.errors.length > 0,
   );
   const canUpload =
-    pairings.length > 0 && invalidPairings.length === 0 && !isReading;
+    pairings.length > 0 &&
+    invalidPairings.length === 0 &&
+    !isReading &&
+    !isUploading;
 
   return (
     <div className="app-shell">
@@ -271,6 +388,12 @@ function App() {
             </p>
           )}
 
+          {successMessage && (
+            <p className="success-message" role="status">
+              {successMessage}
+            </p>
+          )}
+
           <div className="format-guide">
             <h3>Required format</h3>
             <p>
@@ -296,6 +419,8 @@ function App() {
             <p>
               {isReading
                 ? "Reading your file…"
+                : isUploading
+                  ? "Uploading your pairings…"
                 : pairings.length
                   ? invalidPairings.length
                     ? `${invalidPairings.length} ${invalidPairings.length === 1 ? "row needs" : "rows need"} attention before upload.`
@@ -306,8 +431,9 @@ function App() {
               className="continue-button"
               type="button"
               disabled={!canUpload}
+              onClick={handleUpload}
             >
-              Upload pairings
+              {isUploading ? "Uploading…" : "Upload pairings"}
             </button>
           </div>
         </section>
@@ -350,7 +476,14 @@ function App() {
                   {pairings.map((pairing, index) => (
                     <tr
                       key={`${pairing.menteeName}-${pairing.mentorName}-${index}`}
-                      className={pairing.errors.length ? "invalid-row" : ""}
+                      className={
+                        pairing.errors.length
+                          ? "invalid-row"
+                          : pairing.uploadState === "uploaded-with-skips" ||
+                              pairing.uploadState === "skipped"
+                            ? "skipped-row"
+                            : ""
+                      }
                     >
                       <td>{pairing.mentorName}</td>
                       <td>{pairing.menteeName}</td>
@@ -364,6 +497,14 @@ function App() {
                               <li key={rowError}>{rowError}</li>
                             ))}
                           </ul>
+                        ) : pairing.notices.length ? (
+                          <ul className="notice-list">
+                            {pairing.notices.map((notice) => (
+                              <li key={notice}>{notice}</li>
+                            ))}
+                          </ul>
+                        ) : pairing.uploadState === "uploaded" ? (
+                          <span className="uploaded-label">Uploaded</span>
                         ) : (
                           <span className="valid-label">Valid</span>
                         )}
