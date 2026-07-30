@@ -775,6 +775,19 @@ function App() {
               </button>
             </div>
 
+            <div className="rules-callout" role="note" aria-label="Editing rules">
+              <strong>Editing rules</strong>
+              <ul>
+                <li><span className="inline-code-label">Member Name</span> is required and must be unique.</li>
+                <li><span className="inline-code-label">Member Big</span> is optional, but if you set it, that mentor must already exist.</li>
+                <li>A member cannot list themself as their own mentor.</li>
+                <li><span className="inline-code-label">Dynasty</span> must be <span className="inline-code-label">fire</span>, <span className="inline-code-label">water</span>, <span className="inline-code-label">earth</span>, or <span className="inline-code-label">wind</span>.</li>
+                <li>When you rename a member, any mentees linked to that member are updated automatically.</li>
+                <li>When you delete a mentor, affected <span className="inline-code-label">Member Big</span> values are cleared to <span className="inline-code-label">null</span> automatically.</li>
+                <li>Adding a member with a missing mentor will prompt you to confirm creating that mentor too.</li>
+              </ul>
+            </div>
+
             {membersError && (
               <p className="error-message panel-message" role="alert">
                 {membersError}

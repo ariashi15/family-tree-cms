@@ -302,6 +302,37 @@ h1 {
   margin-top: 1rem;
 }
 
+.rules-callout {
+  margin: 1.25rem 2rem 0;
+  padding: 1rem 1.15rem;
+  border: 1px solid #d7dfd2;
+  border-radius: 0.85rem;
+  background: #f6f8f2;
+}
+
+.rules-callout strong {
+  display: block;
+  margin-bottom: 0.6rem;
+  color: #2e4032;
+  font-size: 0.9rem;
+}
+
+.rules-callout ul {
+  margin: 0;
+  padding-left: 1.15rem;
+  color: #5c6659;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.rules-callout li + li {
+  margin-top: 0.3rem;
+}
+
+.inline-code-label {
+  font-weight: 700;
+}
+
 .add-member-panel {
   padding: 1.5rem 2rem 1.75rem;
   border-bottom: 1px solid #e1e3dd;
@@ -718,7 +749,8 @@ tbody tr.skipped-row:hover {
 
   .drop-zone,
   .selected-file,
-  .format-guide {
+  .format-guide,
+  .rules-callout {
     margin-right: 1.25rem;
     margin-left: 1.25rem;
   }
