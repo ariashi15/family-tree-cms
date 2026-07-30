@@ -1,12 +1,16 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
 
 const expectedColumns = ["mentor_name", "mentee_name", "dynasty"];
-const allowedDynasties = new Set(["fire", "water", "earth", "wind"]);
+const allowedDynasties = ["fire", "water", "earth", "wind"] as const;
 const apiUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3000").replace(
   /\/$/,
   "",
 );
+
+type Tab = "members" | "bulk-upload";
+
+type UploadState = "pending" | "uploaded" | "uploaded-with-skips" | "skipped";
 
 type Pairing = {
   mentorName: string;
@@ -15,7 +19,7 @@ type Pairing = {
   rowNumber: number;
   errors: string[];
   notices: string[];
-  uploadState: "pending" | "uploaded" | "uploaded-with-skips" | "skipped";
+  uploadState: UploadState;
 };
 
 type ImportConflict = {
@@ -37,6 +41,59 @@ type ImportSuccessResponse = {
 
 type ApiErrorResponse = {
   error?: string;
+};
+
+type Member = {
+  id: string;
+  member_name: string;
+  member_big: string | null;
+  dynasty: (typeof allowedDynasties)[number];
+  is_dynasty_head: boolean | null;
+};
+
+type MembersResponse = {
+  members: Member[];
+};
+
+type MemberResponse = {
+  member: Member;
+  createdMentor?: Member | null;
+};
+
+type EditableMember = {
+  id: string;
+  memberName: string;
+  memberBig: string;
+  dynasty: (typeof allowedDynasties)[number];
+  isDynastyHead: "true" | "false";
+  isSaving: boolean;
+  isDeleting: boolean;
+  rowError: string;
+};
+
+type ConfirmDialogState =
+  | {
+      type: "save";
+      memberId: string;
+    }
+  | {
+      type: "delete";
+      memberId: string;
+      memberName: string;
+    }
+  | {
+      type: "create-missing-mentor";
+      mentorName: string;
+    }
+  | null;
+
+type NewMemberForm = {
+  memberName: string;
+  memberBig: string;
+  dynasty: (typeof allowedDynasties)[number];
+  isDynastyHead: "true" | "false";
+  error: string;
+  isSubmitting: boolean;
 };
 
 function formatFileSize(bytes: number) {
@@ -92,26 +149,84 @@ function parseCsv(content: string) {
   );
 }
 
+function toEditableMember(member: Member): EditableMember {
+  return {
+    id: member.id,
+    memberName: member.member_name,
+    memberBig: member.member_big ?? "",
+    dynasty: member.dynasty,
+    isDynastyHead: member.is_dynasty_head ? "true" : "false",
+    isSaving: false,
+    isDeleting: false,
+    rowError: "",
+  };
+}
+
 function App() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<Tab>("members");
+
+  const [members, setMembers] = useState<EditableMember[]>([]);
+  const [membersError, setMembersError] = useState("");
+  const [membersSuccess, setMembersSuccess] = useState("");
+  const [isMembersLoading, setIsMembersLoading] = useState(true);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
+  const [newMemberForm, setNewMemberForm] = useState<NewMemberForm>({
+    memberName: "",
+    memberBig: "",
+    dynasty: "fire",
+    isDynastyHead: "false",
+    error: "",
+    isSubmitting: false,
+  });
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pairings, setPairings] = useState<Pairing[]>([]);
-  const [error, setError] = useState("");
+  const [uploadError, setUploadError] = useState("");
+  const [uploadSuccessMessage, setUploadSuccessMessage] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isReading, setIsReading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
+
+  useEffect(() => {
+    void loadMembers();
+  }, []);
+
+  async function loadMembers() {
+    setIsMembersLoading(true);
+    setMembersError("");
+
+    try {
+      const response = await fetch(`${apiUrl}/api/members`);
+      const payload = (await response.json()) as MembersResponse | ApiErrorResponse;
+
+      if (!response.ok) {
+        setMembersError(
+          "error" in payload && payload.error
+            ? payload.error
+            : "The member list could not be loaded.",
+        );
+        return;
+      }
+
+      setMembers((payload as MembersResponse).members.map(toEditableMember));
+    } catch {
+      setMembersError("The member list could not be loaded. Please check the API connection.");
+    } finally {
+      setIsMembersLoading(false);
+    }
+  }
 
   const selectFile = async (file?: File) => {
-    setError("");
-    setSuccessMessage("");
+    setUploadError("");
+    setUploadSuccessMessage("");
     setPairings([]);
 
     if (!file) return;
 
     if (!file.name.toLowerCase().endsWith(".csv")) {
       setSelectedFile(null);
-      setError("Choose a CSV file with a .csv extension.");
+      setUploadError("Choose a CSV file with a .csv extension.");
       return;
     }
 
@@ -141,20 +256,20 @@ function App() {
       const mappedPairings = parsedRows.slice(1).map((row, index) => {
         const rowNumber = index + 2;
         const errors: string[] = [];
+        const [mentorName = "", menteeName = "", dynasty = ""] = row;
 
         if (row.length !== expectedColumns.length) {
-          errors.push(
-            `This row has ${row.length} columns; exactly 3 are required.`,
-          );
+          errors.push(`This row has ${row.length} columns; exactly 3 are required.`);
         }
-
-        const [mentorName = "", menteeName = "", dynasty = ""] = row;
 
         if (!mentorName || !menteeName || !dynasty) {
           errors.push("Mentor, mentee, and dynasty are all required.");
         }
 
-        if (dynasty && !allowedDynasties.has(dynasty)) {
+        if (
+          dynasty &&
+          !allowedDynasties.includes(dynasty as (typeof allowedDynasties)[number])
+        ) {
           errors.push(
             `"${dynasty}" is not a valid dynasty. Use fire, water, earth, or wind.`,
           );
@@ -182,9 +297,7 @@ function App() {
       menteeRows.forEach((duplicates) => {
         if (duplicates.length < 2) return;
 
-        const rowNumbers = duplicates
-          .map((pairing) => pairing.rowNumber)
-          .join(", ");
+        const rowNumbers = duplicates.map((pairing) => pairing.rowNumber).join(", ");
 
         duplicates.forEach((pairing) => {
           pairing.errors.push(
@@ -195,7 +308,7 @@ function App() {
 
       setPairings(mappedPairings);
     } catch (caughtError) {
-      setError(
+      setUploadError(
         caughtError instanceof Error
           ? caughtError.message
           : "The CSV could not be read.",
@@ -208,26 +321,33 @@ function App() {
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setIsDragging(false);
-    selectFile(event.dataTransfer.files[0]);
+    void selectFile(event.dataTransfer.files[0]);
   };
 
   const clearFile = () => {
     setSelectedFile(null);
     setPairings([]);
-    setError("");
-    setSuccessMessage("");
+    setUploadError("");
+    setUploadSuccessMessage("");
 
     if (inputRef.current) {
       inputRef.current.value = "";
     }
   };
 
+  const invalidPairings = pairings.filter((pairing) => pairing.errors.length > 0);
+  const canUpload =
+    pairings.length > 0 &&
+    invalidPairings.length === 0 &&
+    !isReading &&
+    !isUploading;
+
   const handleUpload = async () => {
     if (!canUpload) return;
 
     setIsUploading(true);
-    setError("");
-    setSuccessMessage("");
+    setUploadError("");
+    setUploadSuccessMessage("");
 
     try {
       const response = await fetch(`${apiUrl}/api/pairings/import`, {
@@ -249,7 +369,7 @@ function App() {
         | ApiErrorResponse;
 
       if (!response.ok) {
-        setError(
+        setUploadError(
           "error" in payload && payload.error
             ? payload.error
             : "The upload could not be completed. Please try again.",
@@ -258,7 +378,6 @@ function App() {
       }
 
       const successPayload = payload as ImportSuccessResponse;
-
       const resultsByRow = new Map(
         successPayload.results.map((result) => [result.rowNumber, result]),
       );
@@ -267,9 +386,7 @@ function App() {
         currentPairings.map((pairing) => {
           const result = resultsByRow.get(pairing.rowNumber);
 
-          if (!result) {
-            return pairing;
-          }
+          if (!result) return pairing;
 
           const notices = result.skipped.map((conflict) => conflict.message);
           const uploadState =
@@ -287,231 +404,812 @@ function App() {
         }),
       );
 
-      setSuccessMessage(
+      setUploadSuccessMessage(
         `${successPayload.insertedCount} ${successPayload.insertedCount === 1 ? "member was" : "members were"} inserted into the database.${successPayload.skippedCount ? ` ${successPayload.skippedCount} ${successPayload.skippedCount === 1 ? "existing person was" : "existing people were"} skipped.` : ""}`,
       );
+      await loadMembers();
     } catch {
-      setError("The upload could not be completed. Please check the API connection.");
+      setUploadError("The upload could not be completed. Please check the API connection.");
     } finally {
       setIsUploading(false);
     }
   };
 
-  const invalidPairings = pairings.filter(
-    (pairing) => pairing.errors.length > 0,
-  );
-  const canUpload =
-    pairings.length > 0 &&
-    invalidPairings.length === 0 &&
-    !isReading &&
-    !isUploading;
+  const updateMemberField = (
+    memberId: string,
+    field: "memberName" | "memberBig" | "dynasty" | "isDynastyHead",
+    value: string,
+  ) => {
+    setMembers((currentMembers) =>
+      currentMembers.map((member) =>
+        member.id === memberId
+          ? { ...member, [field]: value, rowError: "" }
+          : member,
+      ),
+    );
+    setMembersError("");
+    setMembersSuccess("");
+  };
+
+  const updateNewMemberField = (
+    field: "memberName" | "memberBig" | "dynasty" | "isDynastyHead",
+    value: string,
+  ) => {
+    setNewMemberForm((currentForm) => ({
+      ...currentForm,
+      [field]: value,
+      error: "",
+    }));
+    setMembersError("");
+    setMembersSuccess("");
+  };
+
+  const resetNewMemberForm = () => {
+    setNewMemberForm({
+      memberName: "",
+      memberBig: "",
+      dynasty: "fire",
+      isDynastyHead: "false",
+      error: "",
+      isSubmitting: false,
+    });
+  };
+
+  const validateNewMemberForm = () => {
+    const trimmedMemberName = newMemberForm.memberName.trim();
+    const trimmedMemberBig = newMemberForm.memberBig.trim();
+
+    if (!trimmedMemberName) {
+      return "Member name is required.";
+    }
+
+    if (
+      members.some(
+        (member) =>
+          member.memberName.trim().toLocaleLowerCase() ===
+          trimmedMemberName.toLocaleLowerCase(),
+      )
+    ) {
+      return `${trimmedMemberName} already exists in the database as a member.`;
+    }
+
+    if (!allowedDynasties.includes(newMemberForm.dynasty)) {
+      return "Dynasty must be fire, water, earth, or wind.";
+    }
+
+    if (
+      trimmedMemberBig &&
+      trimmedMemberBig.toLocaleLowerCase() === trimmedMemberName.toLocaleLowerCase()
+    ) {
+      return "A member cannot list themself as their own mentor.";
+    }
+
+    return "";
+  };
+
+  const createMember = async (createMissingMentor: boolean) => {
+    const trimmedMemberName = newMemberForm.memberName.trim();
+    const trimmedMemberBig = newMemberForm.memberBig.trim();
+
+    setNewMemberForm((currentForm) => ({
+      ...currentForm,
+      isSubmitting: true,
+      error: "",
+    }));
+    setMembersError("");
+    setMembersSuccess("");
+
+    try {
+      const response = await fetch(`${apiUrl}/api/members`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          member_name: trimmedMemberName,
+          member_big: trimmedMemberBig || null,
+          dynasty: newMemberForm.dynasty,
+          is_dynasty_head: newMemberForm.isDynastyHead === "true",
+          create_missing_mentor: createMissingMentor,
+        }),
+      });
+
+      const payload = (await response.json()) as
+        | MemberResponse
+        | (ApiErrorResponse & {
+            requiresMentorConfirmation?: boolean;
+            missingMentorName?: string;
+          });
+
+      if (!response.ok) {
+        if (
+          response.status === 409 &&
+          "requiresMentorConfirmation" in payload &&
+          payload.requiresMentorConfirmation &&
+          payload.missingMentorName
+        ) {
+          setConfirmDialog({
+            type: "create-missing-mentor",
+            mentorName: payload.missingMentorName,
+          });
+          return;
+        }
+
+        const formError =
+          "error" in payload && payload.error
+            ? payload.error
+            : "The member could not be created.";
+
+        setNewMemberForm((currentForm) => ({
+          ...currentForm,
+          error: formError,
+        }));
+        setMembersError(formError);
+        return;
+      }
+
+      const successPayload = payload as MemberResponse;
+      const successMessage = successPayload.createdMentor
+        ? `${successPayload.member.member_name} was added. ${successPayload.createdMentor.member_name} was also created as a mentor.`
+        : `${successPayload.member.member_name} was added.`;
+
+      resetNewMemberForm();
+      setMembersSuccess(successMessage);
+      await loadMembers();
+    } catch {
+      const formError =
+        "The member could not be created. Please check the API connection.";
+      setNewMemberForm((currentForm) => ({
+        ...currentForm,
+        error: formError,
+      }));
+      setMembersError(formError);
+    } finally {
+      setNewMemberForm((currentForm) => ({
+        ...currentForm,
+        isSubmitting: false,
+      }));
+    }
+  };
+
+  const saveMember = async (memberId: string) => {
+    const target = members.find((member) => member.id === memberId);
+
+    if (!target) return;
+
+    const trimmedMemberName = target.memberName.trim();
+    const trimmedMemberBig = target.memberBig.trim();
+    const duplicateMember = members.find(
+      (member) =>
+        member.id !== memberId &&
+        member.memberName.trim().toLocaleLowerCase() ===
+          trimmedMemberName.toLocaleLowerCase(),
+    );
+
+    let rowError = "";
+
+    if (!trimmedMemberName) {
+      rowError = "Member name is required.";
+    } else if (!allowedDynasties.includes(target.dynasty)) {
+      rowError = "Dynasty must be fire, water, earth, or wind.";
+    } else if (duplicateMember) {
+      rowError = `${trimmedMemberName} already exists in the editor.`;
+    } else if (
+      trimmedMemberBig &&
+      trimmedMemberBig.toLocaleLowerCase() === trimmedMemberName.toLocaleLowerCase()
+    ) {
+      rowError = "A member cannot list themself as their own mentor.";
+    } else if (
+      trimmedMemberBig &&
+      !members.some(
+        (member) =>
+          member.memberName.trim().toLocaleLowerCase() ===
+          trimmedMemberBig.toLocaleLowerCase(),
+      )
+    ) {
+      rowError = `${trimmedMemberBig} does not exist in the database as a member.`;
+    }
+
+    if (rowError) {
+      setMembers((currentMembers) =>
+        currentMembers.map((member) =>
+          member.id === memberId ? { ...member, rowError } : member,
+        ),
+      );
+      setMembersError(rowError);
+      return;
+    }
+
+    setMembersError("");
+    setMembersSuccess("");
+    setMembers((currentMembers) =>
+      currentMembers.map((member) =>
+        member.id === memberId
+          ? { ...member, isSaving: true, rowError: "" }
+          : member,
+      ),
+    );
+
+    try {
+      const response = await fetch(`${apiUrl}/api/members/${memberId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          member_name: target.memberName.trim(),
+          member_big: target.memberBig.trim() || null,
+          dynasty: target.dynasty,
+          is_dynasty_head: target.isDynastyHead === "true",
+        }),
+      });
+
+      const payload = (await response.json()) as MemberResponse | ApiErrorResponse;
+
+      if (!response.ok) {
+        const rowError =
+          "error" in payload && payload.error
+            ? payload.error
+            : "The member could not be updated.";
+
+        setMembers((currentMembers) =>
+          currentMembers.map((member) =>
+            member.id === memberId ? { ...member, rowError } : member,
+          ),
+        );
+        setMembersError(rowError);
+        return;
+      }
+
+      const updatedMember = (payload as MemberResponse).member;
+      setMembers((currentMembers) =>
+        currentMembers.map((member) =>
+          member.id === memberId
+            ? { ...toEditableMember(updatedMember), isSaving: false, isDeleting: false }
+            : member,
+        ),
+      );
+      setMembersSuccess(`Saved changes for ${updatedMember.member_name}.`);
+      await loadMembers();
+    } catch {
+      setMembersError("The member could not be updated. Please check the API connection.");
+    } finally {
+      setMembers((currentMembers) =>
+        currentMembers.map((member) =>
+          member.id === memberId ? { ...member, isSaving: false } : member,
+        ),
+      );
+    }
+  };
+
+  const deleteMember = async (memberId: string) => {
+    setMembersError("");
+    setMembersSuccess("");
+    setMembers((currentMembers) =>
+      currentMembers.map((member) =>
+        member.id === memberId ? { ...member, isDeleting: true } : member,
+      ),
+    );
+
+    try {
+      const response = await fetch(`${apiUrl}/api/members/${memberId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as ApiErrorResponse;
+        setMembersError(payload.error ?? "The member could not be deleted.");
+        return;
+      }
+
+      setMembers((currentMembers) =>
+        currentMembers.filter((member) => member.id !== memberId),
+      );
+      setMembersSuccess("The row was deleted.");
+    } catch {
+      setMembersError("The member could not be deleted. Please check the API connection.");
+    }
+  };
+
+  const confirmAction = async () => {
+    if (!confirmDialog) return;
+
+    const currentDialog = confirmDialog;
+    setConfirmDialog(null);
+
+    if (currentDialog.type === "save") {
+      await saveMember(currentDialog.memberId);
+      return;
+    }
+
+    if (currentDialog.type === "create-missing-mentor") {
+      await createMember(true);
+      return;
+    }
+
+    await deleteMember(currentDialog.memberId);
+  };
 
   return (
     <div className="app-shell">
       <header className="site-header">
-        <a className="brand" href="/" aria-label="Family Tree CMS home">
+        <a className="brand" href="/" aria-label="CSA Family Tree CMS home">
           <span>CSA Family Tree Content Management System</span>
         </a>
       </header>
 
-      <main>
+      <main className="layout-shell">
         <div className="page-heading">
-          <h1>Upload mentor pairings</h1>
+          <h1>Manage family tree records</h1>
           <p className="intro">
-            Add mentor and mentee relationships to the family trees from a CSV
-            file.
+            Edit individual member data or bulk upload mentor-mentee pairings.
           </p>
         </div>
 
-        <section className="upload-card" aria-labelledby="upload-heading">
-          <div className="card-heading">
-            <div>
-              <h2 id="upload-heading">Choose your CSV file</h2>
-            </div>
-            <span className="file-type">CSV</span>
-          </div>
+        <nav className="tab-nav" aria-label="CMS sections">
+          <button
+            className={`tab-button ${activeTab === "members" ? "is-active" : ""}`}
+            type="button"
+            onClick={() => setActiveTab("members")}
+          >
+            Edit Members
+          </button>
+          <button
+            className={`tab-button ${activeTab === "bulk-upload" ? "is-active" : ""}`}
+            type="button"
+            onClick={() => setActiveTab("bulk-upload")}
+          >
+            Bulk Upload
+          </button>
+        </nav>
 
-          {selectedFile ? (
-            <div className="selected-file" aria-live="polite">
-              <div className="file-icon" aria-hidden="true">
-                <span>CSV</span>
+        {activeTab === "members" ? (
+          <section className="preview-card" aria-labelledby="members-heading">
+            <div className="preview-heading">
+              <div>
+                <p className="eyebrow">Database editor</p>
+                <h2 id="members-heading">Edit all member data</h2>
               </div>
-              <div className="file-details">
-                <strong>{selectedFile.name}</strong>
-                <span>{formatFileSize(selectedFile.size)}</span>
-              </div>
-              <button className="remove-button" type="button" onClick={clearFile}>
-                Remove
+              <button className="choose-button" type="button" onClick={() => void loadMembers()}>
+                Refresh
               </button>
             </div>
-          ) : (
-            <div
-              className={`drop-zone ${isDragging ? "is-dragging" : ""}`}
-              onDragEnter={(event) => {
-                event.preventDefault();
-                setIsDragging(true);
-              }}
-              onDragOver={(event) => event.preventDefault()}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
-            >
-              <div className="upload-icon" aria-hidden="true">
-                ↑
+
+            {membersError && (
+              <p className="error-message panel-message" role="alert">
+                {membersError}
+              </p>
+            )}
+
+            {membersSuccess && (
+              <p className="success-message panel-message" role="status">
+                {membersSuccess}
+              </p>
+            )}
+
+            <div className="add-member-panel">
+              <div className="panel-heading-row">
+                <div>
+                  <p className="eyebrow">Manual entry</p>
+                  <h3>Add new member</h3>
+                </div>
+                <button
+                  className="continue-button"
+                  type="button"
+                  disabled={newMemberForm.isSubmitting}
+                  onClick={() => {
+                    const formError = validateNewMemberForm();
+
+                    if (formError) {
+                      setNewMemberForm((currentForm) => ({
+                        ...currentForm,
+                        error: formError,
+                      }));
+                      setMembersError(formError);
+                      return;
+                    }
+
+                    void createMember(false);
+                  }}
+                >
+                  {newMemberForm.isSubmitting ? "Adding…" : "Add new member"}
+                </button>
               </div>
-              <strong>Drag and drop your CSV here</strong>
-              <span>or</span>
+
+              <div className="add-member-grid">
+                <label className="field-group">
+                  <span>Member name</span>
+                  <input
+                    className="cell-input"
+                    type="text"
+                    value={newMemberForm.memberName}
+                    onChange={(event) =>
+                      updateNewMemberField("memberName", event.target.value)
+                    }
+                  />
+                </label>
+
+                <label className="field-group">
+                  <span>Member big</span>
+                  <input
+                    className="cell-input"
+                    type="text"
+                    placeholder="No mentor"
+                    value={newMemberForm.memberBig}
+                    onChange={(event) =>
+                      updateNewMemberField("memberBig", event.target.value)
+                    }
+                  />
+                </label>
+
+                <label className="field-group">
+                  <span>Dynasty</span>
+                  <select
+                    className="cell-select"
+                    value={newMemberForm.dynasty}
+                    onChange={(event) =>
+                      updateNewMemberField("dynasty", event.target.value)
+                    }
+                  >
+                    {allowedDynasties.map((dynasty) => (
+                      <option key={dynasty} value={dynasty}>
+                        {dynasty}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field-group">
+                  <span>Dynasty head</span>
+                  <select
+                    className="cell-select"
+                    value={newMemberForm.isDynastyHead}
+                    onChange={(event) =>
+                      updateNewMemberField("isDynastyHead", event.target.value)
+                    }
+                  >
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                  </select>
+                </label>
+              </div>
+
+              {newMemberForm.error && (
+                <p className="error-message inline-error" role="alert">
+                  {newMemberForm.error}
+                </p>
+              )}
+            </div>
+
+            {isMembersLoading ? (
+              <div className="empty-state">Loading member records…</div>
+            ) : members.length === 0 ? (
+              <div className="empty-state">No member rows were found in the database.</div>
+            ) : (
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Member Name</th>
+                      <th scope="col">Member Big</th>
+                      <th scope="col">Dynasty</th>
+                      <th scope="col">Dynasty Head</th>
+                      <th scope="col">Save</th>
+                      <th scope="col">Delete</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {members.map((member) => (
+                      <tr key={member.id}>
+                        <td>
+                          <input
+                            className="cell-input"
+                            type="text"
+                            value={member.memberName}
+                            onChange={(event) =>
+                              updateMemberField(member.id, "memberName", event.target.value)
+                            }
+                          />
+                          {member.rowError && <p className="row-error">{member.rowError}</p>}
+                        </td>
+                        <td>
+                          <input
+                            className="cell-input"
+                            type="text"
+                            value={member.memberBig}
+                            placeholder="No mentor"
+                            onChange={(event) =>
+                              updateMemberField(member.id, "memberBig", event.target.value)
+                            }
+                          />
+                        </td>
+                        <td>
+                          <select
+                            className="cell-select"
+                            value={member.dynasty}
+                            onChange={(event) =>
+                              updateMemberField(member.id, "dynasty", event.target.value)
+                            }
+                          >
+                            {allowedDynasties.map((dynasty) => (
+                              <option key={dynasty} value={dynasty}>
+                                {dynasty}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <select
+                            className="cell-select"
+                            value={member.isDynastyHead}
+                            onChange={(event) =>
+                              updateMemberField(
+                                member.id,
+                                "isDynastyHead",
+                                event.target.value,
+                              )
+                            }
+                          >
+                            <option value="false">No</option>
+                            <option value="true">Yes</option>
+                          </select>
+                        </td>
+                        <td>
+                          <button
+                            className="row-action"
+                            type="button"
+                            disabled={member.isSaving || member.isDeleting}
+                            onClick={() =>
+                              setConfirmDialog({ type: "save", memberId: member.id })
+                            }
+                          >
+                            {member.isSaving ? "Saving…" : "Save"}
+                          </button>
+                        </td>
+                        <td>
+                          <button
+                            className="row-action row-action-danger"
+                            type="button"
+                            disabled={member.isSaving || member.isDeleting}
+                            onClick={() =>
+                              setConfirmDialog({
+                                type: "delete",
+                                memberId: member.id,
+                                memberName: member.memberName,
+                              })
+                            }
+                          >
+                            {member.isDeleting ? "Deleting…" : "Delete"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        ) : (
+          <>
+            <section className="upload-card" aria-labelledby="upload-heading">
+              <div className="card-heading">
+                <div>
+                  <p className="eyebrow">Bulk upload</p>
+                  <h2 id="upload-heading">Upload mentor pairings</h2>
+                </div>
+                <span className="file-type">CSV</span>
+              </div>
+
+              {selectedFile ? (
+                <div className="selected-file" aria-live="polite">
+                  <div className="file-icon" aria-hidden="true">
+                    <span>CSV</span>
+                  </div>
+                  <div className="file-details">
+                    <strong>{selectedFile.name}</strong>
+                    <span>{formatFileSize(selectedFile.size)}</span>
+                  </div>
+                  <button className="remove-button" type="button" onClick={clearFile}>
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className={`drop-zone ${isDragging ? "is-dragging" : ""}`}
+                  onDragEnter={(event) => {
+                    event.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={handleDrop}
+                >
+                  <div className="upload-icon" aria-hidden="true">
+                    ↑
+                  </div>
+                  <strong>Drag and drop your CSV here</strong>
+                  <span>or</span>
+                  <button
+                    className="choose-button"
+                    type="button"
+                    onClick={() => inputRef.current?.click()}
+                  >
+                    Choose file
+                  </button>
+                  <input
+                    ref={inputRef}
+                    className="visually-hidden"
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={(event) => void selectFile(event.target.files?.[0])}
+                  />
+                </div>
+              )}
+
+              {uploadError && (
+                <p className="error-message" role="alert">
+                  {uploadError}
+                </p>
+              )}
+
+              {uploadSuccessMessage && (
+                <p className="success-message" role="status">
+                  {uploadSuccessMessage}
+                </p>
+              )}
+
+              <div className="format-guide">
+                <h3>Required format</h3>
+                <p>
+                  The first row of your file must contain these column headers in
+                  this order:
+                </p>
+                <div className="column-list" aria-label="Required CSV columns">
+                  {expectedColumns.map((column, index) => (
+                    <span key={column}>
+                      <b>{index + 1}</b>
+                      <code>{column}</code>
+                    </span>
+                  ))}
+                </div>
+                <p className="relationship-note">
+                  Dynasties must be <code>fire</code>, <code>water</code>,{" "}
+                  <code>earth</code>, or <code>wind</code>. A mentor may appear in
+                  multiple rows. Each mentee should appear only once.
+                </p>
+              </div>
+
+              <div className="card-footer">
+                <p>
+                  {isReading
+                    ? "Reading your file…"
+                    : isUploading
+                      ? "Uploading your pairings…"
+                      : pairings.length
+                        ? invalidPairings.length
+                          ? `${invalidPairings.length} ${invalidPairings.length === 1 ? "row needs" : "rows need"} attention before upload.`
+                          : `${pairings.length} valid ${pairings.length === 1 ? "pairing" : "pairings"} ready to upload.`
+                        : "Select a file to preview its contents."}
+                </p>
+                <button
+                  className="continue-button"
+                  type="button"
+                  disabled={!canUpload}
+                  onClick={() => void handleUpload()}
+                >
+                  {isUploading ? "Uploading…" : "Upload pairings"}
+                </button>
+              </div>
+            </section>
+
+            {pairings.length > 0 && (
+              <section className="preview-card" aria-labelledby="preview-heading">
+                <div className="preview-heading">
+                  <div>
+                    <p className="eyebrow">File preview</p>
+                    <h2 id="preview-heading">Review your pairings</h2>
+                  </div>
+                  <span className="row-count">
+                    {invalidPairings.length
+                      ? `${invalidPairings.length} invalid`
+                      : `${pairings.length} ${pairings.length === 1 ? "row" : "rows"}`}
+                  </span>
+                </div>
+
+                {invalidPairings.length > 0 && (
+                  <div className="validation-summary" role="alert">
+                    <strong>Some rows need attention</strong>
+                    <span>
+                      Fix the highlighted rows in your CSV, then upload the file
+                      again.
+                    </span>
+                  </div>
+                )}
+
+                <div className="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">Mentor</th>
+                        <th scope="col">Mentee</th>
+                        <th scope="col">Dynasty</th>
+                        <th scope="col">Validation</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pairings.map((pairing, index) => (
+                        <tr
+                          key={`${pairing.menteeName}-${pairing.mentorName}-${index}`}
+                          className={
+                            pairing.errors.length
+                              ? "invalid-row"
+                              : pairing.uploadState === "uploaded-with-skips" ||
+                                  pairing.uploadState === "skipped"
+                                ? "skipped-row"
+                                : ""
+                          }
+                        >
+                          <td>{pairing.mentorName}</td>
+                          <td>{pairing.menteeName}</td>
+                          <td>
+                            <span className="dynasty-pill">{pairing.dynasty}</span>
+                          </td>
+                          <td className="validation-cell">
+                            {pairing.errors.length ? (
+                              <ul>
+                                {pairing.errors.map((rowError) => (
+                                  <li key={rowError}>{rowError}</li>
+                                ))}
+                              </ul>
+                            ) : pairing.notices.length ? (
+                              <ul className="notice-list">
+                                {pairing.notices.map((notice) => (
+                                  <li key={notice}>{notice}</li>
+                                ))}
+                              </ul>
+                            ) : pairing.uploadState === "uploaded" ? (
+                              <span className="uploaded-label">Uploaded</span>
+                            ) : (
+                              <span className="valid-label">Valid</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+          </>
+        )}
+      </main>
+
+      {confirmDialog && (
+        <div className="dialog-backdrop" role="presentation">
+          <div className="dialog-card" role="dialog" aria-modal="true">
+            <h2>Confirm action</h2>
+            <p>
+              {confirmDialog.type === "save"
+                ? "Save the changes to this row in the database?"
+                : confirmDialog.type === "create-missing-mentor"
+                  ? `${confirmDialog.mentorName} does not exist yet. Add that mentor as a new row too?`
+                : `Delete ${confirmDialog.memberName} from the database?`}
+            </p>
+            <div className="dialog-actions">
               <button
                 className="choose-button"
                 type="button"
-                onClick={() => inputRef.current?.click()}
+                onClick={() => setConfirmDialog(null)}
               >
-                Choose file
+                Cancel
               </button>
-              <input
-                ref={inputRef}
-                className="visually-hidden"
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(event) => selectFile(event.target.files?.[0])}
-              />
+              <button className="continue-button" type="button" onClick={() => void confirmAction()}>
+                Confirm
+              </button>
             </div>
-          )}
-
-          {error && (
-            <p className="error-message" role="alert">
-              {error}
-            </p>
-          )}
-
-          {successMessage && (
-            <p className="success-message" role="status">
-              {successMessage}
-            </p>
-          )}
-
-          <div className="format-guide">
-            <h3>Required format</h3>
-            <p>
-              The first row of your file must contain these column headers in
-              this order:
-            </p>
-            <div className="column-list" aria-label="Required CSV columns">
-              {expectedColumns.map((column, index) => (
-                <span key={column}>
-                  <b>{index + 1}</b>
-                  <code>{column}</code>
-                </span>
-              ))}
-            </div>
-            <p className="relationship-note">
-              Dynasties must be <code>fire</code>, <code>water</code>,{" "}
-              <code>earth</code>, or <code>wind</code>. A mentor may appear in
-              multiple rows. Each mentee should appear only once.
-            </p>
           </div>
-
-          <div className="card-footer">
-            <p>
-              {isReading
-                ? "Reading your file…"
-                : isUploading
-                  ? "Uploading your pairings…"
-                : pairings.length
-                  ? invalidPairings.length
-                    ? `${invalidPairings.length} ${invalidPairings.length === 1 ? "row needs" : "rows need"} attention before upload.`
-                    : `${pairings.length} valid ${pairings.length === 1 ? "pairing" : "pairings"} ready to upload.`
-                  : "Select a file to preview its contents."}
-            </p>
-            <button
-              className="continue-button"
-              type="button"
-              disabled={!canUpload}
-              onClick={handleUpload}
-            >
-              {isUploading ? "Uploading…" : "Upload pairings"}
-            </button>
-          </div>
-        </section>
-
-        {pairings.length > 0 && (
-          <section className="preview-card" aria-labelledby="preview-heading">
-            <div className="preview-heading">
-              <div>
-                <p className="eyebrow">File preview</p>
-                <h2 id="preview-heading">Review your pairings</h2>
-              </div>
-              <span className="row-count">
-                {invalidPairings.length
-                  ? `${invalidPairings.length} invalid`
-                  : `${pairings.length} ${pairings.length === 1 ? "row" : "rows"}`}
-              </span>
-            </div>
-
-            {invalidPairings.length > 0 && (
-              <div className="validation-summary" role="alert">
-                <strong>Some rows need attention</strong>
-                <span>
-                  Fix the highlighted rows in your CSV, then upload the file
-                  again.
-                </span>
-              </div>
-            )}
-
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th scope="col">Mentor</th>
-                    <th scope="col">Mentee</th>
-                    <th scope="col">Dynasty</th>
-                    <th scope="col">Validation</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pairings.map((pairing, index) => (
-                    <tr
-                      key={`${pairing.menteeName}-${pairing.mentorName}-${index}`}
-                      className={
-                        pairing.errors.length
-                          ? "invalid-row"
-                          : pairing.uploadState === "uploaded-with-skips" ||
-                              pairing.uploadState === "skipped"
-                            ? "skipped-row"
-                            : ""
-                      }
-                    >
-                      <td>{pairing.mentorName}</td>
-                      <td>{pairing.menteeName}</td>
-                      <td>
-                        <span className="dynasty-pill">{pairing.dynasty}</span>
-                      </td>
-                      <td className="validation-cell">
-                        {pairing.errors.length ? (
-                          <ul>
-                            {pairing.errors.map((rowError) => (
-                              <li key={rowError}>{rowError}</li>
-                            ))}
-                          </ul>
-                        ) : pairing.notices.length ? (
-                          <ul className="notice-list">
-                            {pairing.notices.map((notice) => (
-                              <li key={notice}>{notice}</li>
-                            ))}
-                          </ul>
-                        ) : pairing.uploadState === "uploaded" ? (
-                          <span className="uploaded-label">Uploaded</span>
-                        ) : (
-                          <span className="valid-label">Valid</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-      </main>
+        </div>
+      )}
     </div>
   );
 }

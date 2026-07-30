@@ -41,6 +41,19 @@ type MemberInsert = {
   dynasty: string;
 };
 
+type MemberUpdateRequest = {
+  member_name: string;
+  member_big: string | null;
+  dynasty: string;
+  is_dynasty_head: boolean;
+};
+
+type MemberCreateRequest = MemberUpdateRequest & {
+  create_missing_mentor?: boolean;
+};
+
+const allowedDynasties = new Set(["fire", "water", "earth", "wind"]);
+
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
 const allowedOrigins = process.env.CORS_ORIGIN
@@ -89,6 +102,296 @@ app.get("/api/members", async (_request, response) => {
   response.json({
     members: (data ?? []) as MemberRow[],
   });
+});
+
+app.post("/api/members", async (request, response) => {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    response.status(500).json({
+      error:
+        "Supabase is not configured. Add SUPABASE_URL and SUPABASE_SECRET_KEY in apps/api/.env.",
+    });
+    return;
+  }
+
+  const creation = parseMemberCreateRequest(request.body);
+
+  if (!creation) {
+    response.status(400).json({
+      error:
+        "Request body must include member_name, member_big, dynasty, and is_dynasty_head.",
+    });
+    return;
+  }
+
+  const normalizedMemberName = creation.member_name.toLocaleLowerCase();
+  const namesToCheck = new Set<string>([creation.member_name]);
+
+  if (creation.member_big) {
+    if (creation.member_big.toLocaleLowerCase() === normalizedMemberName) {
+      response.status(400).json({
+        error: "A member cannot list themself as their own mentor.",
+      });
+      return;
+    }
+
+    namesToCheck.add(creation.member_big);
+  }
+
+  const { data: existingMembers, error: existingMembersError } = await supabase
+    .from(membersTable)
+    .select("id, member_name")
+    .in("member_name", [...namesToCheck]);
+
+  if (existingMembersError) {
+    response.status(500).json({ error: existingMembersError.message });
+    return;
+  }
+
+  const existingByLowerName = new Map(
+    (existingMembers ?? []).map((member) => [
+      member.member_name.toLocaleLowerCase(),
+      member,
+    ]),
+  );
+
+  if (existingByLowerName.has(normalizedMemberName)) {
+    response.status(409).json({
+      error: `${creation.member_name} already exists in the database as a member.`,
+    });
+    return;
+  }
+
+  const mentorName = creation.member_big;
+  const normalizedMentorName = mentorName?.toLocaleLowerCase();
+  const mentorExists = normalizedMentorName
+    ? existingByLowerName.has(normalizedMentorName)
+    : true;
+
+  if (mentorName && !mentorExists && !creation.create_missing_mentor) {
+    response.status(409).json({
+      error: `${mentorName} does not exist in the database as a member yet.`,
+      missingMentorName: mentorName,
+      requiresMentorConfirmation: true,
+    });
+    return;
+  }
+
+  const inserts: MemberInsert[] = [];
+
+  if (mentorName && !mentorExists) {
+    inserts.push({
+      member_name: mentorName,
+      member_big: null,
+      dynasty: creation.dynasty,
+    });
+  }
+
+  inserts.push({
+    member_name: creation.member_name,
+    member_big: creation.member_big,
+    dynasty: creation.dynasty,
+  });
+
+  const { data, error } = await supabase
+    .from(membersTable)
+    .insert(inserts)
+    .select("id, created_at, member_name, member_big, dynasty, is_dynasty_head");
+
+  if (error) {
+    response.status(500).json({ error: error.message });
+    return;
+  }
+
+  const createdMembers = (data ?? []) as MemberRow[];
+  const createdMember = createdMembers.find(
+    (member) =>
+      member.member_name.toLocaleLowerCase() === normalizedMemberName,
+  );
+
+  response.status(201).json({
+    member: createdMember,
+    createdMentor:
+      mentorName && !mentorExists
+        ? createdMembers.find(
+            (member) =>
+              member.member_name.toLocaleLowerCase() === normalizedMentorName,
+          ) ?? null
+        : null,
+  });
+});
+
+app.patch("/api/members/:id", async (request, response) => {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    response.status(500).json({
+      error:
+        "Supabase is not configured. Add SUPABASE_URL and SUPABASE_SECRET_KEY in apps/api/.env.",
+    });
+    return;
+  }
+
+  const memberId = getTrimmedString(request.params.id);
+  const updates = parseMemberUpdateRequest(request.body);
+
+  if (!memberId) {
+    response.status(400).json({ error: "A member id is required." });
+    return;
+  }
+
+  if (!updates) {
+    response.status(400).json({
+      error:
+        "Request body must include member_name, member_big, dynasty, and is_dynasty_head.",
+    });
+    return;
+  }
+
+  const { data: currentMember, error: currentMemberError } = await supabase
+    .from(membersTable)
+    .select("id, member_name")
+    .eq("id", memberId)
+    .single();
+
+  if (currentMemberError || !currentMember) {
+    response.status(404).json({ error: "That member could not be found." });
+    return;
+  }
+
+  const normalizedMemberName = updates.member_name.toLocaleLowerCase();
+  const { data: duplicateMembers, error: duplicateMembersError } = await supabase
+    .from(membersTable)
+    .select("id, member_name")
+    .ilike("member_name", updates.member_name);
+
+  if (duplicateMembersError) {
+    response.status(500).json({ error: duplicateMembersError.message });
+    return;
+  }
+
+  const duplicateMember = (duplicateMembers ?? []).find(
+    (member) =>
+      member.id !== memberId &&
+      member.member_name.toLocaleLowerCase() === normalizedMemberName,
+  );
+
+  if (duplicateMember) {
+    response.status(409).json({
+      error: `${updates.member_name} already exists in the database as a member.`,
+    });
+    return;
+  }
+
+  if (updates.member_big) {
+    if (updates.member_big.toLocaleLowerCase() === normalizedMemberName) {
+      response.status(400).json({
+        error: "A member cannot list themself as their own mentor.",
+      });
+      return;
+    }
+
+    const { data: mentorMembers, error: mentorMembersError } = await supabase
+      .from(membersTable)
+      .select("id, member_name")
+      .ilike("member_name", updates.member_big);
+
+    if (mentorMembersError) {
+      response.status(500).json({ error: mentorMembersError.message });
+      return;
+    }
+
+    const matchingMentor = (mentorMembers ?? []).find(
+      (member) =>
+        member.member_name.toLocaleLowerCase() ===
+        updates.member_big!.toLocaleLowerCase(),
+    );
+
+    if (!matchingMentor) {
+      response.status(400).json({
+        error: `${updates.member_big} does not exist in the database as a member.`,
+      });
+      return;
+    }
+  }
+
+  const { data, error } = await supabase
+    .from(membersTable)
+    .update(updates)
+    .eq("id", memberId)
+    .select("id, created_at, member_name, member_big, dynasty, is_dynasty_head")
+    .single();
+
+  if (error) {
+    response.status(500).json({ error: error.message });
+    return;
+  }
+
+  if (currentMember.member_name !== updates.member_name) {
+    const { error: cascadeError } = await supabase
+      .from(membersTable)
+      .update({ member_big: updates.member_name })
+      .eq("member_big", currentMember.member_name);
+
+    if (cascadeError) {
+      response.status(500).json({ error: cascadeError.message });
+      return;
+    }
+  }
+
+  response.json({
+    member: data as MemberRow,
+  });
+});
+
+app.delete("/api/members/:id", async (request, response) => {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    response.status(500).json({
+      error:
+        "Supabase is not configured. Add SUPABASE_URL and SUPABASE_SECRET_KEY in apps/api/.env.",
+    });
+    return;
+  }
+
+  const memberId = getTrimmedString(request.params.id);
+
+  if (!memberId) {
+    response.status(400).json({ error: "A member id is required." });
+    return;
+  }
+
+  const { data: currentMember, error: currentMemberError } = await supabase
+    .from(membersTable)
+    .select("id, member_name")
+    .eq("id", memberId)
+    .single();
+
+  if (currentMemberError || !currentMember) {
+    response.status(404).json({ error: "That member could not be found." });
+    return;
+  }
+
+  const { error: clearMentorError } = await supabase
+    .from(membersTable)
+    .update({ member_big: null })
+    .eq("member_big", currentMember.member_name);
+
+  if (clearMentorError) {
+    response.status(500).json({ error: clearMentorError.message });
+    return;
+  }
+
+  const { error } = await supabase.from(membersTable).delete().eq("id", memberId);
+
+  if (error) {
+    response.status(500).json({ error: error.message });
+    return;
+  }
+
+  response.status(204).send();
 });
 
 app.post("/api/pairings/import", async (request, response) => {
@@ -285,4 +588,51 @@ function parsePairingImportRequest(
 
 function getTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function parseMemberUpdateRequest(value: unknown): MemberUpdateRequest | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+
+  const memberName = getTrimmedString(payload.member_name);
+  const memberBigRaw = payload.member_big;
+  const memberBig =
+    memberBigRaw === null ? null : getTrimmedString(memberBigRaw) || null;
+  const dynasty = getTrimmedString(payload.dynasty).toLowerCase();
+  const isDynastyHead = payload.is_dynasty_head;
+
+  if (
+    !memberName ||
+    !allowedDynasties.has(dynasty) ||
+    typeof isDynastyHead !== "boolean"
+  ) {
+    return null;
+  }
+
+  return {
+    member_name: memberName,
+    member_big: memberBig,
+    dynasty,
+    is_dynasty_head: isDynastyHead,
+  };
+}
+
+function parseMemberCreateRequest(value: unknown): MemberCreateRequest | null {
+  const parsedUpdate = parseMemberUpdateRequest(value);
+
+  if (!parsedUpdate || !value || typeof value !== "object") {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  const createMissingMentor = payload.create_missing_mentor;
+
+  return {
+    ...parsedUpdate,
+    create_missing_mentor:
+      typeof createMissingMentor === "boolean" ? createMissingMentor : false,
+  };
 }
