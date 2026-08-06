@@ -83,15 +83,15 @@ Add:
 
 Verify:
 
-- [ ] you get a confirmation popup, not a hard error
-- [ ] popup explains that Greg does not exist and a new row for Greg will also be created
-- [ ] after confirming, Fiona is created
-- [ ] after confirming, Greg is created
-- [ ] after confirming, Greg has Member Big = null
-- [ ] after confirming, Fiona has Member Big = Greg Hall
-- [ ] after confirming, the page refreshes automatically
+- [x] you get a confirmation popup, not a hard error
+- [x] popup explains that Greg does not exist and a new row for Greg will also be created
+- [x] after confirming, Fiona is created
+- [x] after confirming, Greg is created
+- [x] after confirming, Greg has Member Big = null
+- [x] after confirming, Fiona has Member Big = Greg Hall
+- [x] after confirming, the page refreshes automatically
 
-- [ ] Also test canceling that popup and confirm no rows are created.
+- [x] Also test canceling that popup and confirm no rows are created.
 
 ## 6. Edit Member: Simple Non-Cascading Changes
 
