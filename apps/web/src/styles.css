@@ -388,6 +388,11 @@ h1 {
   align-self: flex-start;
 }
 
+.add-member-button {
+  width: 7rem;
+  align-self: flex-start;
+}
+
 .search-row {
   padding: 1.25rem 2rem 1rem;
 }
