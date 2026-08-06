@@ -67,11 +67,11 @@ Verify:
 
 Test:
 
-- [ ] blank Member Name should block add
-- [ ] duplicate Member Name should block add
-- [ ] duplicate Member Name with different case should block add
-- [ ] Member Big same as Member Name should block add
-- [ ] only the four valid dynasties are available in the dropdown
+- [x] blank Member Name should block add
+- [x] duplicate Member Name should block add
+- [x] duplicate Member Name with different case should block add
+- [x] Member Big same as Member Name should block add
+- [x] only the four valid dynasties are available in the dropdown
 
 ## 5. Add Member: Missing Mentor Automation
 

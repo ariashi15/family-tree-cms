@@ -1159,7 +1159,6 @@ function App() {
                           ...currentForm,
                           error: formError,
                         }));
-                        setMembersError(formError);
                         return;
                       }
 
