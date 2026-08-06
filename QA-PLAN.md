@@ -155,11 +155,11 @@ Rename a member who is nobody’s mentor:
 
 Verify:
 
-- [ ] confirmation popup shows Member Name: David Kim -> Daniel Kim
-- [ ] no cascade sentence appears if nobody references that name
-- [ ] save succeeds
-- [ ] page refreshes
-- [ ] search works for new name, not old one
+- [x] confirmation popup shows Member Name: David Kim -> Daniel Kim
+- [x] no cascade sentence appears if nobody references that name
+- [x] save succeeds
+- [x] page refreshes
+- [x] search works for new name, not old one
 
 ## 9. Edit Member: Rename With Cascades
 
