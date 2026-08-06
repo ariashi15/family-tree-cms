@@ -75,9 +75,14 @@ type ConfirmDialogState =
   | {
       type: "save";
       memberId: string;
+      memberName: string;
       createMissingMentor: boolean;
       summaryLines: string[];
       effectLines: string[];
+      cascadeSections: {
+        label: string;
+        summaryLines: string[];
+      }[];
     }
   | {
       type: "delete";
@@ -88,6 +93,7 @@ type ConfirmDialogState =
     }
   | {
       type: "create-missing-mentor";
+      memberName: string;
       mentorName: string;
       summaryLines: string[];
       additionalSummaryLines: string[];
@@ -118,6 +124,14 @@ type UploadSuccessDialogState = {
 } | null;
 
 type MemberSnapshot = {
+  memberName: string;
+  memberBig: string;
+  dynasty: (typeof allowedDynasties)[number];
+  isDynastyHead: "true" | "false";
+};
+
+type MemberDraft = {
+  id: string;
   memberName: string;
   memberBig: string;
   dynasty: (typeof allowedDynasties)[number];
@@ -226,6 +240,71 @@ function getDynastySelectClass(dynasty: string) {
 
 function getDynastyHeadSelectClass(value: "true" | "false") {
   return "cell-select";
+}
+
+function getConnectedFamilyRelativeNames(
+  members: EditableMember[],
+  rootMemberId: string,
+  updatedMemberName: string,
+  updatedMemberBig: string,
+) {
+  const nodes = members.map((member) =>
+    member.id === rootMemberId
+      ? {
+          ...member,
+          memberName: updatedMemberName,
+          memberBig: updatedMemberBig,
+        }
+      : member,
+  );
+  const byId = new Map(nodes.map((member) => [member.id, member]));
+  const byName = new Map(
+    nodes.map((member) => [member.memberName.trim().toLocaleLowerCase(), member.id]),
+  );
+  const adjacency = new Map<string, Set<string>>();
+
+  nodes.forEach((member) => {
+    adjacency.set(member.id, adjacency.get(member.id) ?? new Set());
+  });
+
+  nodes.forEach((member) => {
+    const normalizedBig = member.memberBig.trim().toLocaleLowerCase();
+
+    if (!normalizedBig) return;
+
+    const bigId = byName.get(normalizedBig);
+
+    if (!bigId) return;
+
+    adjacency.get(member.id)?.add(bigId);
+    adjacency.get(bigId)?.add(member.id);
+  });
+
+  const visited = new Set<string>();
+  const queue = [rootMemberId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+
+    if (!currentId || visited.has(currentId) || !byId.has(currentId)) {
+      continue;
+    }
+
+    visited.add(currentId);
+
+    adjacency.get(currentId)?.forEach((neighborId) => {
+      if (!visited.has(neighborId)) {
+        queue.push(neighborId);
+      }
+    });
+  }
+
+  visited.delete(rootMemberId);
+
+  return [...visited]
+    .map((memberId) => byId.get(memberId)?.memberName ?? "")
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right));
 }
 
 function App() {
@@ -585,10 +664,16 @@ function App() {
         : members.find((member) => member.id === memberId);
     const original = memberSnapshots[memberId];
 
-    if (!current || !original) return { summaryLines: [], effectLines: [] };
+    if (!current || !original) {
+      return { summaryLines: [], effectLines: [], cascadeSections: [] };
+    }
 
     const summaryLines: string[] = [];
     const effectLines: string[] = [];
+    const cascadeSections: {
+      label: string;
+      summaryLines: string[];
+    }[] = [];
 
     if (current.memberName.trim() !== original.memberName.trim()) {
       summaryLines.push(
@@ -629,6 +714,27 @@ function App() {
       }
     }
 
+    if (current.dynasty !== original.dynasty) {
+      const dynastyChangeLine = `Dynasty: ${formatDynasty(original.dynasty)} -> ${formatDynasty(current.dynasty)}`;
+      const relativeNames = getConnectedFamilyRelativeNames(
+        members,
+        memberId,
+        current.memberName.trim(),
+        current.memberBig.trim(),
+      );
+
+      cascadeSections.push({
+        label: `${current.memberName}'s relatives: ${
+          relativeNames.length > 0 ? relativeNames.join(", ") : "N/A"
+        }`,
+        summaryLines: relativeNames.length > 0 ? [dynastyChangeLine] : [],
+      });
+
+      effectLines.push(
+        "All members of the same family must remain in the same dynasty, so the following updates will also be made:",
+      );
+    }
+
     if (createMissingMentor && current.memberBig.trim()) {
       effectLines.push(
         `${current.memberBig.trim()} does not exist in the database, so a new row for ${current.memberBig.trim()} will also be created.`,
@@ -639,6 +745,7 @@ function App() {
       summaryLines:
         summaryLines.length > 0 ? summaryLines : ["No visible field changes."],
       effectLines,
+      cascadeSections,
     };
   };
 
@@ -740,6 +847,7 @@ function App() {
         ) {
           setConfirmDialog({
             type: "create-missing-mentor",
+            memberName: trimmedMemberName,
             mentorName: payload.missingMentorName,
             summaryLines: [
               `Member Name: ${trimmedMemberName}`,
@@ -797,9 +905,14 @@ function App() {
     }
   };
 
-  const saveMember = async (memberId: string, createMissingMentor = false) => {
+  const saveMember = async (
+    memberId: string,
+    createMissingMentor = false,
+    targetOverride?: MemberDraft,
+  ) => {
     const target =
-      editDialog && editDialog.memberId === memberId
+      targetOverride ??
+      (editDialog && editDialog.memberId === memberId
         ? {
             id: editDialog.memberId,
             memberName: editDialog.memberName,
@@ -807,7 +920,7 @@ function App() {
             dynasty: editDialog.dynasty,
             isDynastyHead: editDialog.isDynastyHead,
           }
-        : members.find((member) => member.id === memberId);
+        : members.find((member) => member.id === memberId));
 
     if (!target) return;
 
@@ -874,13 +987,18 @@ function App() {
           payload.requiresMentorConfirmation &&
           payload.missingMentorName
         ) {
-          const { summaryLines, effectLines } = buildSaveSummary(memberId, true);
+          const { summaryLines, effectLines, cascadeSections } = buildSaveSummary(
+            memberId,
+            true,
+          );
           setConfirmDialog({
             type: "save",
             memberId,
+            memberName: target.memberName,
             createMissingMentor: true,
             summaryLines,
             effectLines,
+            cascadeSections,
           });
           return;
         }
@@ -952,12 +1070,24 @@ function App() {
     if (!confirmDialog) return;
 
     const currentDialog = confirmDialog;
+    const currentEditDraft =
+      editDialog && currentDialog.type === "save" && editDialog.memberId === currentDialog.memberId
+        ? {
+            id: editDialog.memberId,
+            memberName: editDialog.memberName,
+            memberBig: editDialog.memberBig,
+            dynasty: editDialog.dynasty,
+            isDynastyHead: editDialog.isDynastyHead,
+          }
+        : undefined;
     setConfirmDialog(null);
 
     if (currentDialog.type === "save") {
+      setEditDialog(null);
       await saveMember(
         currentDialog.memberId,
         currentDialog.createMissingMentor,
+        currentEditDraft,
       );
       return;
     }
@@ -1005,7 +1135,7 @@ function App() {
             trimmedMemberBig.toLocaleLowerCase(),
       );
 
-    const { summaryLines, effectLines } = buildSaveSummary(
+    const { summaryLines, effectLines, cascadeSections } = buildSaveSummary(
       editDialog.memberId,
       createMissingMentor,
     );
@@ -1013,9 +1143,11 @@ function App() {
     setConfirmDialog({
       type: "save",
       memberId: editDialog.memberId,
+      memberName: editDialog.memberName,
       createMissingMentor,
       summaryLines,
       effectLines,
+      cascadeSections,
     });
   };
 
@@ -1465,9 +1597,9 @@ function App() {
             </h2>
             <p>
               {confirmDialog.type === "save"
-                ? "Review the changes that will be saved:"
+                ? `Review the changes for ${confirmDialog.memberName}:`
                 : confirmDialog.type === "create-missing-mentor"
-                  ? "Review the row that will be added:"
+                  ? `Review the row for ${confirmDialog.memberName} that will be added:`
                 : `Review the changes that will happen when ${confirmDialog.memberName} is deleted:`}
             </p>
             {"summaryLines" in confirmDialog && confirmDialog.summaryLines.length > 0 && (
@@ -1483,13 +1615,32 @@ function App() {
                   <p
                     key={line}
                     className={
-                      confirmDialog.type === "create-missing-mentor"
+                      confirmDialog.type === "create-missing-mentor" ||
+                      (confirmDialog.type === "save" &&
+                        line ===
+                          "All family members must remain in the same dynasty, so the following updates will also be made:")
                         ? "dialog-section-label"
                         : undefined
                     }
                   >
                     {line}
                   </p>
+                ))}
+              </div>
+            )}
+            {confirmDialog.type === "save" && confirmDialog.cascadeSections.length > 0 && (
+              <div className="dialog-cascade-sections">
+                {confirmDialog.cascadeSections.map((section) => (
+                  <div key={section.label} className="dialog-cascade-section">
+                    <p className="dialog-cascade-label">{section.label}</p>
+                    {section.summaryLines.length > 0 && (
+                      <ul className="dialog-summary">
+                        {section.summaryLines.map((line) => (
+                          <li key={`${section.label}-${line}`}>{line}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

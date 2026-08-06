@@ -252,7 +252,7 @@ app.patch("/api/members/:id", async (request, response) => {
 
   const { data: currentMember, error: currentMemberError } = await supabase
     .from(membersTable)
-    .select("id, member_name")
+    .select("id, member_name, member_big, dynasty")
     .eq("id", memberId)
     .single();
 
@@ -368,6 +368,49 @@ app.patch("/api/members/:id", async (request, response) => {
     if (cascadeError) {
       response.status(500).json({ error: cascadeError.message });
       return;
+    }
+  }
+
+  if (currentMember.dynasty !== updates.dynasty) {
+    const { data: familyRows, error: familyRowsError } = await supabase
+      .from(membersTable)
+      .select("id, member_name, member_big");
+
+    if (familyRowsError) {
+      response.status(500).json({ error: familyRowsError.message });
+      return;
+    }
+
+    const graphMembers = (familyRows ?? []) as Pick<
+      MemberRow,
+      "id" | "member_name" | "member_big"
+    >[];
+
+    if (createdMentor) {
+      graphMembers.push({
+        id: createdMentor.id,
+        member_name: createdMentor.member_name,
+        member_big: createdMentor.member_big,
+      });
+    }
+
+    const relatedMembers = getConnectedFamilyMembers(
+      graphMembers,
+      memberId,
+      updates.member_name,
+      updates.member_big,
+    );
+
+    for (const relatedMember of relatedMembers) {
+      const { error: relativeDynastyError } = await supabase
+        .from(membersTable)
+        .update({ dynasty: updates.dynasty })
+        .eq("id", relatedMember.id);
+
+      if (relativeDynastyError) {
+        response.status(500).json({ error: relativeDynastyError.message });
+        return;
+      }
     }
   }
 
@@ -620,6 +663,81 @@ function parsePairingImportRequest(
 
 function getTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getConnectedFamilyMembers(
+  members: Pick<MemberRow, "id" | "member_name" | "member_big">[],
+  rootMemberId: string,
+  updatedMemberName: string,
+  updatedMemberBig: string | null,
+) {
+  const normalizedRootMemberId = String(rootMemberId);
+  const nodes = members.map((member) =>
+    String(member.id) === normalizedRootMemberId
+      ? {
+          ...member,
+          id: String(member.id),
+          member_name: updatedMemberName,
+          member_big: updatedMemberBig,
+        }
+      : {
+          ...member,
+          id: String(member.id),
+        },
+  );
+  const byId = new Map(nodes.map((member) => [member.id, member]));
+  const adjacency = new Map<string, Set<string>>();
+  const byName = new Map(
+    nodes.map((member) => [member.member_name.toLocaleLowerCase(), member.id]),
+  );
+
+  nodes.forEach((member) => {
+    adjacency.set(member.id, adjacency.get(member.id) ?? new Set());
+  });
+
+  nodes.forEach((member) => {
+    if (!member.member_big) return;
+
+    const bigId = byName.get(member.member_big.toLocaleLowerCase());
+
+    if (!bigId) return;
+
+    adjacency.get(member.id)?.add(bigId);
+    adjacency.get(bigId)?.add(member.id);
+  });
+
+  const visited = new Set<string>();
+  const queue = [normalizedRootMemberId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+
+    if (!currentId || visited.has(currentId) || !byId.has(currentId)) {
+      continue;
+    }
+
+    visited.add(currentId);
+
+    adjacency.get(currentId)?.forEach((neighborId) => {
+      if (!visited.has(neighborId)) {
+        queue.push(neighborId);
+      }
+    });
+  }
+
+  visited.delete(rootMemberId);
+
+  const relatedMembers: Pick<MemberRow, "id" | "member_name" | "member_big">[] = [];
+
+  visited.forEach((memberId) => {
+    const member = byId.get(memberId);
+
+    if (member) {
+      relatedMembers.push(member);
+    }
+  });
+
+  return relatedMembers;
 }
 
 function parseMemberUpdateRequest(value: unknown): MemberUpdateRequest | null {

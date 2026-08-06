@@ -15,6 +15,7 @@ This gives coverage for:
 
 - [x] members with no mentor
 - [x] multiple people sharing one mentor
+- [x] dynasty cascades across the full family tree
 - [x] rename cascades
 - [x] delete cascades
 - [x] duplicate checks
@@ -97,23 +98,56 @@ Verify:
 
 Pick a row and change only one field at a time:
 
-- Dynasty
 - Dynasty Head
 - Member Big from one existing mentor to another existing mentor
 
 For each, verify:
 
-- [ ] confirmation popup appears
-- [ ] popup shows only the changed fields
-- [ ] save succeeds
+- [x] confirmation popup appears
+- [x] popup shows only the changed fields
+- [x] save succeeds
+- [x] page refreshes automatically
+- [x] data persists after refresh
+
+## 7. Edit Member: Dynasty Cascade
+
+Change a member's dynasty:
+
+- Ben Carter: Fire -> Wind
+
+Verify:
+
+- [x] confirmation popup shows Dynasty: Fire -> Wind
+- [x] popup explains that all members of the same family must remain in the same dynasty
+- [x] popup shows a relatives section for Ben Carter
+- [x] save succeeds
+- [x] page refreshes automatically
+- [x] Ben's dynasty becomes Wind
+- [x] Ben's big's dynasty becomes Wind
+- [x] Ben's siblings in the same family tree also update to Wind
+
+Also test a deeper family tree. Add this setup first if needed:
+
+- Eva Stone, Member Big = Ben Carter, Dynasty = Fire, Dynasty Head = No
+- Fiona Reed, Member Big = Eva Stone, Dynasty = Fire, Dynasty Head = No
+
+Then test:
+
+- Alice Wong: Fire -> Water
+
+Verify:
+
+- [ ] confirmation popup shows Dynasty: Fire -> Water
+- [ ] popup explains that all members of the same family must remain in the same dynasty
+- [ ] popup shows one relatives section listing all connected family members who will also update
+- [ ] after confirming, Alice's dynasty becomes Water
+- [ ] after confirming, Ben's dynasty becomes Water
+- [ ] after confirming, Clara's dynasty becomes Water
+- [ ] after confirming, Eva's dynasty becomes Water
+- [ ] after confirming, Fiona's dynasty becomes Water
 - [ ] page refreshes automatically
-- [ ] data persists after refresh
 
-Important regression check:
-
-- [ ] changing only Dynasty should not trigger duplicate-name errors
-
-## 7. Edit Member: Rename Without Cascades
+## 8. Edit Member: Rename Without Cascades
 
 Rename a member who is nobody’s mentor:
 
@@ -127,7 +161,7 @@ Verify:
 - [ ] page refreshes
 - [ ] search works for new name, not old one
 
-## 8. Edit Member: Rename With Cascades
+## 9. Edit Member: Rename With Cascades
 
 Rename a mentor with dependents:
 
@@ -143,7 +177,7 @@ Verify:
 - [ ] page refreshes automatically
 - [ ] search by new mentor name finds dependent rows
 
-## 9. Edit Member: Add Missing Mentor Through Edit
+## 10. Edit Member: Add Missing Mentor Through Edit
 
 Change an existing row’s Member Big to a nonexistent person:
 
@@ -161,7 +195,7 @@ Verify:
 
 - [ ] Also test canceling and confirm no rows change.
 
-## 10. Edit Member: Validation
+## 11. Edit Member: Validation
 
 Test:
 
@@ -171,7 +205,7 @@ Test:
 - [ ] changing Member Big to same as Member Name should block save
 - [ ] invalid dynasty should be impossible via dropdown
 
-## 11. Delete Member: No Dependents
+## 12. Delete Member: No Dependents
 
 Delete someone with no mentees.
 
@@ -184,7 +218,7 @@ Verify:
 
 - [ ] Also test canceling and confirm no change happens.
 
-## 12. Delete Member: With Dependents
+## 13. Delete Member: With Dependents
 
 Delete a mentor with active dependents:
 
@@ -197,18 +231,19 @@ Verify:
 - [ ] after confirming, all affected dependent rows now have Member Big = null
 - [ ] after confirming, the page refreshes automatically
 
-## 13. Refresh Behavior
+## 14. Refresh Behavior
 
 After each of these actions, confirm the table reflects server state immediately without manual reload:
 
 - [ ] add
 - [ ] edit
+- [ ] edit with dynasty cascades
 - [ ] rename with cascades
 - [ ] edit with missing mentor auto-create
 - [ ] delete
 - [ ] delete with dependent nulling
 
-## 14. Bulk Upload Interaction With Editor
+## 15. Bulk Upload Interaction With Editor
 
 After using Bulk Upload:
 
@@ -219,7 +254,7 @@ After using Bulk Upload:
 - [ ] verify sort order still works
 - [ ] verify search finds them
 
-## 15. Suggested Edge Cases
+## 16. Suggested Edge Cases
 
 Also test:
 
@@ -227,6 +262,8 @@ Also test:
 - [ ] same name entered with different capitalization
 - [ ] very long names
 - [ ] adding a member whose auto-created mentor later gets edited
+- [ ] changing a member's dynasty in the middle of a multi-generation family tree
+- [ ] changing a member's dynasty when they have both ancestors and descendants in the same connected tree
 - [ ] deleting an auto-created mentor after people point to them
 
 ## Pass Criteria
@@ -236,6 +273,7 @@ The feature passes if:
 - [ ] all changes require confirmation
 - [ ] confirmations accurately describe direct edits
 - [ ] automatic follow-on changes are explained in plain language
+- [ ] dynasty changes cascade correctly across the full connected family tree
 - [ ] missing mentors are automated instead of hard-blocked
 - [ ] renames cascade correctly
 - [ ] deletes null out dependent Member Big values
