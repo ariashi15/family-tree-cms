@@ -55,13 +55,13 @@ Add:
 Verify:
 
 - [x] confirmation flow behaves correctly
-- [ ] row is created
-- [ ] page refreshes automatically
-- [ ] new row appears in first-name sort order
-- [ ] search can find the new member
-- [ ] search by David Kim finds Eva too
+- [x] row is created
+- [x] page refreshes automatically
+- [x] new row appears in first-name sort order
+- [x] search can find the new member
+- [x] search by David Kim finds Eva too
 
-- [ ] Also test adding a member with Member Big = null.
+- [x] Also test adding a member with Member Big = null.
 
 ## 4. Add Member: Validation
 
