@@ -211,12 +211,12 @@ Delete someone with no mentees.
 
 Verify:
 
-- [ ] confirmation popup appears
-- [ ] it explains the delete
-- [ ] after confirming, the row is removed
-- [ ] after confirming, the page refreshes automatically
+- [x] confirmation popup appears
+- [x] it explains the delete
+- [x] after confirming, the row is removed
+- [x] after confirming, the page refreshes automatically
 
-- [ ] Also test canceling and confirm no change happens.
+- [x] Also test canceling and confirm no change happens.
 
 ## 13. Delete Member: With Dependents
 
@@ -226,45 +226,45 @@ Delete a mentor with active dependents:
 
 Verify:
 
-- [ ] confirmation explains that dependent rows will have Member Big updated to null
-- [ ] after confirming, the mentor row is gone
-- [ ] after confirming, all affected dependent rows now have Member Big = null
-- [ ] after confirming, the page refreshes automatically
+- [x] confirmation explains that dependent rows will have Member Big updated to null
+- [x] after confirming, the mentor row is gone
+- [x] after confirming, all affected dependent rows now have Member Big = null
+- [x] after confirming, the page refreshes automatically
 
 ## 14. Refresh Behavior
 
 After each of these actions, confirm the table reflects server state immediately without manual reload:
 
-- [ ] add
-- [ ] edit
-- [ ] edit with dynasty cascades
-- [ ] rename with cascades
-- [ ] edit with missing mentor auto-create
-- [ ] delete
-- [ ] delete with dependent nulling
+- [x] add
+- [x] edit
+- [x] edit with dynasty cascades
+- [x] rename with cascades
+- [x] edit with missing mentor auto-create
+- [x] delete
+- [x] delete with dependent nulling
 
 ## 15. Bulk Upload Interaction With Editor
 
 After using Bulk Upload:
 
-- [ ] confirm success popup appears
-- [ ] close popup
-- [ ] switch back to Edit Members
-- [ ] verify new members exist in table
-- [ ] verify sort order still works
-- [ ] verify search finds them
+- [x] confirm success popup appears
+- [x] close popup
+- [x] switch back to Edit Members
+- [x] verify new members exist in table
+- [x] verify sort order still works
+- [x] verify search finds them
 
 ## 16. Suggested Edge Cases
 
 Also test:
 
-- [ ] extra spaces around names when editing or adding
-- [ ] same name entered with different capitalization
-- [ ] very long names
-- [ ] adding a member whose auto-created mentor later gets edited
-- [ ] changing a member's dynasty in the middle of a multi-generation family tree
-- [ ] changing a member's dynasty when they have both ancestors and descendants in the same connected tree
-- [ ] deleting an auto-created mentor after people point to them
+- [x] extra spaces around names when editing or adding
+- [x] same name entered with different capitalization
+- [x] very long names
+- [x] adding a member whose auto-created mentor later gets edited
+- [x] changing a member's dynasty in the middle of a multi-generation family tree
+- [x] changing a member's dynasty when they have both ancestors and descendants in the same connected tree
+- [x] deleting an auto-created mentor after people point to them
 
 ## Pass Criteria
 
