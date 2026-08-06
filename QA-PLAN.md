@@ -13,35 +13,35 @@ Start with a small known dataset in the database:
 
 This gives coverage for:
 
-- [ ] members with no mentor
-- [ ] multiple people sharing one mentor
-- [ ] rename cascades
-- [ ] delete cascades
-- [ ] duplicate checks
-- [ ] search by member and mentor
+- [x] members with no mentor
+- [x] multiple people sharing one mentor
+- [x] rename cascades
+- [x] delete cascades
+- [x] duplicate checks
+- [x] search by member and mentor
 
 ## 1. Page Load And Basic UI
 
 Verify:
 
-- [ ] members load successfully
-- [ ] rows are sorted alphabetically by first name
-- [ ] search bar appears above the table
-- [ ] Dynasty displays as Fire, Water, Earth, Wind
-- [ ] Dynasty dropdowns are color-coded correctly
-- [ ] Dynasty Head dropdowns are color-coded correctly
-- [ ] Member Name field appears visually darker than the other text inputs
+- [x] members load successfully
+- [x] rows are sorted alphabetically by first name
+- [x] search bar appears above the table
+- [x] Dynasty displays as Fire, Water, Earth, Wind
+- [x] Dynasty dropdowns are color-coded correctly
+- [x] Dynasty Head dropdowns are color-coded correctly
+- [x] Member Name field appears visually darker than the other text inputs
 
 ## 2. Search
 
 Test:
 
-- [ ] search for Alice and confirm Alice’s row appears
-- [ ] search for Ben and confirm Ben’s row appears
-- [ ] search for Alice Wong and confirm rows with Member Big = Alice Wong also appear
-- [ ] search for a mentor name shared across multiple rows and confirm all matching mentees appear
-- [ ] search for something nonexistent and confirm the empty-state message appears
-- [ ] clear search and confirm full list returns
+- [x] search for Alice and confirm Alice’s row appears
+- [x] search for Ben and confirm Ben’s row appears
+- [x] search for Alice Wong and confirm rows with Member Big = Alice Wong also appear
+- [x] search for a mentor name shared across multiple rows and confirm all matching mentees appear
+- [x] search for something nonexistent and confirm the empty-state message appears
+- [x] clear search and confirm full list returns
 
 ## 3. Add Member: Happy Paths
 
