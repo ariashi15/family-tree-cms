@@ -137,15 +137,15 @@ Then test:
 
 Verify:
 
-- [ ] confirmation popup shows Dynasty: Fire -> Water
-- [ ] popup explains that all members of the same family must remain in the same dynasty
-- [ ] popup shows one relatives section listing all connected family members who will also update
-- [ ] after confirming, Alice's dynasty becomes Water
-- [ ] after confirming, Ben's dynasty becomes Water
-- [ ] after confirming, Clara's dynasty becomes Water
-- [ ] after confirming, Eva's dynasty becomes Water
-- [ ] after confirming, Fiona's dynasty becomes Water
-- [ ] page refreshes automatically
+- [x] confirmation popup shows Dynasty: Fire -> Water
+- [x] popup explains that all members of the same family must remain in the same dynasty
+- [x] popup shows one relatives section listing all connected family members who will also update
+- [x] after confirming, Alice's dynasty becomes Water
+- [x] after confirming, Ben's dynasty becomes Water
+- [x] after confirming, Clara's dynasty becomes Water
+- [x] after confirming, Eva's dynasty becomes Water
+- [x] after confirming, Fiona's dynasty becomes Water
+- [x] page refreshes automatically
 
 ## 8. Edit Member: Rename Without Cascades
 
