@@ -82,7 +82,6 @@ type ConfirmDialogState =
       cascadeSections: {
         label: string;
         summaryLines: string[];
-        additionalSummaryLines?: string[];
       }[];
     }
   | {
@@ -369,7 +368,6 @@ function App() {
 
   const [members, setMembers] = useState<EditableMember[]>([]);
   const [membersError, setMembersError] = useState("");
-  const [membersSuccess, setMembersSuccess] = useState("");
   const [isMembersLoading, setIsMembersLoading] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
   const [editDialog, setEditDialog] = useState<EditDialogState>(null);
@@ -665,7 +663,6 @@ function App() {
         : currentDialog,
     );
     setMembersError("");
-    setMembersSuccess("");
   };
 
   const updateNewMemberField = (
@@ -678,7 +675,6 @@ function App() {
       error: "",
     }));
     setMembersError("");
-    setMembersSuccess("");
   };
 
   const resetNewMemberForm = () => {
@@ -729,7 +725,6 @@ function App() {
     const cascadeSections: {
       label: string;
       summaryLines: string[];
-      additionalSummaryLines?: string[];
     }[] = [];
 
     if (current.memberName.trim() !== original.memberName.trim()) {
@@ -919,7 +914,6 @@ function App() {
       error: "",
     }));
     setMembersError("");
-    setMembersSuccess("");
 
     try {
       const response = await fetch(`${apiUrl}/api/members`, {
@@ -986,13 +980,7 @@ function App() {
         return;
       }
 
-      const successPayload = payload as MemberResponse;
-      const successMessage = successPayload.createdMentor
-        ? `${successPayload.member.member_name} was added. ${successPayload.createdMentor.member_name} was also created as a mentor.`
-        : `${successPayload.member.member_name} was added.`;
-
       resetNewMemberForm();
-      setMembersSuccess(successMessage);
       await loadMembers();
     } catch {
       const formError =
@@ -1053,7 +1041,6 @@ function App() {
     }
 
     setMembersError("");
-    setMembersSuccess("");
     setMembers((currentMembers) =>
       currentMembers.map((member) =>
         member.id === memberId
@@ -1153,7 +1140,6 @@ function App() {
 
   const deleteMember = async (memberId: string) => {
     setMembersError("");
-    setMembersSuccess("");
     setMembers((currentMembers) =>
       currentMembers.map((member) =>
         member.id === memberId ? { ...member, isDeleting: true } : member,
@@ -1174,7 +1160,6 @@ function App() {
       setMembers((currentMembers) =>
         currentMembers.filter((member) => member.id !== memberId),
       );
-      setMembersSuccess("The row was deleted.");
       await loadMembers();
     } catch {
       setMembersError("The member could not be deleted. Please check the API connection.");
@@ -1741,7 +1726,7 @@ function App() {
                       confirmDialog.type === "create-missing-mentor" ||
                       (confirmDialog.type === "save" &&
                         line ===
-                          "All family members must remain in the same dynasty, so the following updates will also be made:")
+                          "All members of the same family must remain in the same dynasty, so the following updates will also be made:")
                         ? "dialog-section-label"
                         : undefined
                     }
