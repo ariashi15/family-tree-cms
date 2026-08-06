@@ -414,6 +414,57 @@ app.patch("/api/members/:id", async (request, response) => {
     }
   }
 
+  if (currentMember.member_big !== updates.member_big && updates.member_big) {
+    const { data: familyRows, error: familyRowsError } = await supabase
+      .from(membersTable)
+      .select("id, member_name, member_big, dynasty");
+
+    if (familyRowsError) {
+      response.status(500).json({ error: familyRowsError.message });
+      return;
+    }
+
+    const graphMembers = (familyRows ?? []) as Pick<
+      MemberRow,
+      "id" | "member_name" | "member_big" | "dynasty"
+    >[];
+
+    if (createdMentor) {
+      graphMembers.push({
+        id: createdMentor.id,
+        member_name: createdMentor.member_name,
+        member_big: createdMentor.member_big,
+        dynasty: createdMentor.dynasty,
+      });
+    }
+
+    const newBig = graphMembers.find(
+      (member) =>
+        member.member_name.toLocaleLowerCase() ===
+        updates.member_big!.toLocaleLowerCase(),
+    );
+
+    if (newBig) {
+      const descendantMembers = getDescendantFamilyMembers(
+        graphMembers,
+        memberId,
+        updates.member_name,
+      );
+
+      const membersToUpdate = [String(memberId), ...descendantMembers.map((member) => member.id)];
+
+      const { error: dynastyInheritanceError } = await supabase
+        .from(membersTable)
+        .update({ dynasty: newBig.dynasty })
+        .in("id", membersToUpdate);
+
+      if (dynastyInheritanceError) {
+        response.status(500).json({ error: dynastyInheritanceError.message });
+        return;
+      }
+    }
+  }
+
   response.json({
     member: data as MemberRow,
     createdMentor,
@@ -738,6 +789,58 @@ function getConnectedFamilyMembers(
   });
 
   return relatedMembers;
+}
+
+function getDescendantFamilyMembers(
+  members: Pick<MemberRow, "id" | "member_name" | "member_big">[],
+  rootMemberId: string,
+  updatedMemberName: string,
+) {
+  const normalizedRootMemberId = String(rootMemberId);
+  const nodes = members.map((member) =>
+    String(member.id) === normalizedRootMemberId
+      ? { ...member, id: String(member.id), member_name: updatedMemberName }
+      : { ...member, id: String(member.id) },
+  );
+  const byName = new Map(
+    nodes.map((member) => [member.member_name.toLocaleLowerCase(), member.id]),
+  );
+  const childrenByParentId = new Map<string, Set<string>>();
+
+  nodes.forEach((member) => {
+    const normalizedBig = member.member_big?.toLocaleLowerCase();
+
+    if (!normalizedBig) return;
+
+    const parentId = byName.get(normalizedBig);
+
+    if (!parentId) return;
+
+    childrenByParentId.set(
+      parentId,
+      (childrenByParentId.get(parentId) ?? new Set()).add(member.id),
+    );
+  });
+
+  const visited = new Set<string>();
+  const queue = [normalizedRootMemberId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+
+    if (!currentId || visited.has(currentId)) continue;
+
+    visited.add(currentId);
+    childrenByParentId.get(currentId)?.forEach((childId) => {
+      if (!visited.has(childId)) {
+        queue.push(childId);
+      }
+    });
+  }
+
+  visited.delete(normalizedRootMemberId);
+
+  return nodes.filter((member) => visited.has(member.id));
 }
 
 function parseMemberUpdateRequest(value: unknown): MemberUpdateRequest | null {

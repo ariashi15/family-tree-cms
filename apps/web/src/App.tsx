@@ -307,6 +307,61 @@ function getConnectedFamilyRelativeNames(
     .sort((left, right) => left.localeCompare(right));
 }
 
+function getDescendantRelativeNames(
+  members: EditableMember[],
+  rootMemberId: string,
+  updatedMemberName: string,
+) {
+  const normalizedRootMemberId = rootMemberId;
+  const nodes = members.map((member) =>
+    member.id === normalizedRootMemberId
+      ? { ...member, memberName: updatedMemberName }
+      : member,
+  );
+  const byName = new Map(
+    nodes.map((member) => [member.memberName.trim().toLocaleLowerCase(), member.id]),
+  );
+  const childrenByParentId = new Map<string, Set<string>>();
+
+  nodes.forEach((member) => {
+    const normalizedBig = member.memberBig.trim().toLocaleLowerCase();
+
+    if (!normalizedBig) return;
+
+    const parentId = byName.get(normalizedBig);
+
+    if (!parentId) return;
+
+    childrenByParentId.set(
+      parentId,
+      (childrenByParentId.get(parentId) ?? new Set()).add(member.id),
+    );
+  });
+
+  const visited = new Set<string>();
+  const queue = [normalizedRootMemberId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+
+    if (!currentId || visited.has(currentId)) continue;
+
+    visited.add(currentId);
+    childrenByParentId.get(currentId)?.forEach((childId) => {
+      if (!visited.has(childId)) {
+        queue.push(childId);
+      }
+    });
+  }
+
+  visited.delete(normalizedRootMemberId);
+
+  return nodes
+    .filter((member) => visited.has(member.id))
+    .map((member) => member.memberName)
+    .sort((left, right) => left.localeCompare(right));
+}
+
 function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<Tab>("members");
@@ -685,6 +740,35 @@ function App() {
       summaryLines.push(
         `Big: ${original.memberBig || "null"} -> ${current.memberBig || "null"}`,
       );
+
+      if (current.memberBig.trim()) {
+        const newBig = members.find(
+          (member) =>
+            member.id !== memberId &&
+            member.memberName.trim().toLocaleLowerCase() ===
+              current.memberBig.trim().toLocaleLowerCase(),
+        );
+        const descendantNames = getDescendantRelativeNames(
+          members,
+          memberId,
+          current.memberName.trim(),
+        );
+
+        effectLines.push(
+          `${current.memberName} and all of their descendants will inherit ${current.memberBig.trim()}'s dynasty.`,
+        );
+
+        cascadeSections.push({
+          label: `${current.memberName}'s tree: ${
+            descendantNames.length > 0
+              ? [current.memberName, ...descendantNames].join(", ")
+              : current.memberName
+          }`,
+          summaryLines: newBig
+            ? [`Dynasty: ${formatDynasty(original.dynasty)} -> ${formatDynasty(newBig.dynasty)}`]
+            : [],
+        });
+      }
     }
 
     if (current.dynasty !== original.dynasty) {
