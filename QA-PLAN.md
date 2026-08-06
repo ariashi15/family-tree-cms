@@ -54,7 +54,7 @@ Add:
 
 Verify:
 
-- [ ] confirmation flow behaves correctly
+- [x] confirmation flow behaves correctly
 - [ ] row is created
 - [ ] page refreshes automatically
 - [ ] new row appears in first-name sort order

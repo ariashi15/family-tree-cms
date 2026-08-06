@@ -818,6 +818,12 @@ tbody tr.skipped-row:hover {
   line-height: 1.5;
 }
 
+.dialog-section-label {
+  margin-bottom: 1.25rem;
+  color: #5f685d;
+  line-height: 1.5;
+}
+
 .dialog-summary {
   margin: -0.5rem 0 1.25rem;
   padding-left: 1.1rem;
@@ -835,6 +841,11 @@ tbody tr.skipped-row:hover {
   color: #5f685d;
   font-size: 0.84rem;
   line-height: 1.5;
+}
+
+.dialog-effects p.dialog-section-label {
+  margin-bottom: 1.25rem;
+  font-size: 1rem;
 }
 
 .dialog-effects p:last-child {

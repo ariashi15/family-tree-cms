@@ -90,6 +90,7 @@ type ConfirmDialogState =
       type: "create-missing-mentor";
       mentorName: string;
       summaryLines: string[];
+      additionalSummaryLines: string[];
       effectLines: string[];
     }
   | null;
@@ -745,6 +746,12 @@ function App() {
               `Big: ${trimmedMemberBig || "null"}`,
               `Dynasty: ${formatDynasty(newMemberForm.dynasty)}`,
               `Dynasty Head: ${formatBool(newMemberForm.isDynastyHead)}`,
+            ],
+            additionalSummaryLines: [
+              `Member Name: ${payload.missingMentorName}`,
+              "Big: null",
+              `Dynasty: ${formatDynasty(newMemberForm.dynasty)}`,
+              "Dynasty Head: No",
             ],
             effectLines: [
               `${payload.missingMentorName} does not exist in the database, so a new row for ${payload.missingMentorName} will also be created.`,
@@ -1461,7 +1468,7 @@ function App() {
               {confirmDialog.type === "save"
                 ? "Review the changes that will be saved:"
                 : confirmDialog.type === "create-missing-mentor"
-                  ? `${confirmDialog.mentorName} does not exist yet. Review the new rows that will be created:`
+                  ? "Review the row that will be added:"
                 : `Review the changes that will happen when ${confirmDialog.memberName} is deleted:`}
             </p>
             {"summaryLines" in confirmDialog && confirmDialog.summaryLines.length > 0 && (
@@ -1474,10 +1481,29 @@ function App() {
             {"effectLines" in confirmDialog && confirmDialog.effectLines.length > 0 && (
               <div className="dialog-effects">
                 {confirmDialog.effectLines.map((line) => (
-                  <p key={line}>{line}</p>
+                  <p
+                    key={line}
+                    className={
+                      confirmDialog.type === "create-missing-mentor"
+                        ? "dialog-section-label"
+                        : undefined
+                    }
+                  >
+                    {line}
+                  </p>
                 ))}
               </div>
             )}
+            {confirmDialog.type === "create-missing-mentor" &&
+              confirmDialog.additionalSummaryLines.length > 0 && (
+                <>
+                  <ul className="dialog-summary">
+                    {confirmDialog.additionalSummaryLines.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
             <div className="dialog-actions">
               <button
                 className="choose-button"
