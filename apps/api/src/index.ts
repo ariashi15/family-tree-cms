@@ -292,6 +292,7 @@ app.patch("/api/members/:id", async (request, response) => {
   }
 
   let createdMentor: MemberRow | null = null;
+  let existingMentor: Pick<MemberRow, "id" | "member_name" | "dynasty"> | null = null;
   const { create_missing_mentor: createMissingMentor, ...memberUpdates } =
     updates;
 
@@ -318,6 +319,21 @@ app.patch("/api/members/:id", async (request, response) => {
         member.member_name.toLocaleLowerCase() ===
         updates.member_big!.toLocaleLowerCase(),
     );
+
+    if (matchingMentor) {
+      const { data: mentorRow, error: mentorRowError } = await supabase
+        .from(membersTable)
+        .select("id, member_name, dynasty")
+        .eq("id", matchingMentor.id)
+        .single();
+
+      if (mentorRowError) {
+        response.status(500).json({ error: mentorRowError.message });
+        return;
+      }
+
+      existingMentor = mentorRow as Pick<MemberRow, "id" | "member_name" | "dynasty">;
+    }
 
     if (!matchingMentor) {
       if (!createMissingMentor) {
@@ -415,36 +431,21 @@ app.patch("/api/members/:id", async (request, response) => {
   }
 
   if (currentMember.member_big !== updates.member_big && updates.member_big) {
-    const { data: familyRows, error: familyRowsError } = await supabase
-      .from(membersTable)
-      .select("id, member_name, member_big, dynasty");
+    if (existingMentor) {
+      const { data: familyRows, error: familyRowsError } = await supabase
+        .from(membersTable)
+        .select("id, member_name, member_big");
 
-    if (familyRowsError) {
-      response.status(500).json({ error: familyRowsError.message });
-      return;
-    }
+      if (familyRowsError) {
+        response.status(500).json({ error: familyRowsError.message });
+        return;
+      }
 
-    const graphMembers = (familyRows ?? []) as Pick<
-      MemberRow,
-      "id" | "member_name" | "member_big" | "dynasty"
-    >[];
+      const graphMembers = (familyRows ?? []) as Pick<
+        MemberRow,
+        "id" | "member_name" | "member_big"
+      >[];
 
-    if (createdMentor) {
-      graphMembers.push({
-        id: createdMentor.id,
-        member_name: createdMentor.member_name,
-        member_big: createdMentor.member_big,
-        dynasty: createdMentor.dynasty,
-      });
-    }
-
-    const newBig = graphMembers.find(
-      (member) =>
-        member.member_name.toLocaleLowerCase() ===
-        updates.member_big!.toLocaleLowerCase(),
-    );
-
-    if (newBig) {
       const descendantMembers = getDescendantFamilyMembers(
         graphMembers,
         memberId,
@@ -455,7 +456,7 @@ app.patch("/api/members/:id", async (request, response) => {
 
       const { error: dynastyInheritanceError } = await supabase
         .from(membersTable)
-        .update({ dynasty: newBig.dynasty })
+        .update({ dynasty: existingMentor.dynasty })
         .in("id", membersToUpdate);
 
       if (dynastyInheritanceError) {

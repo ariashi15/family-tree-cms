@@ -185,15 +185,15 @@ Change an existing row’s Member Big to a nonexistent person:
 
 Verify:
 
-- [ ] save does not hard fail
-- [ ] confirmation explains the field change
-- [ ] confirmation explains that Henry does not exist and a new row for Henry will also be created
-- [ ] after confirming, Henry row exists
-- [ ] after confirming, Henry has Member Big = null
-- [ ] after confirming, Ben now points to Henry
-- [ ] page refreshes automatically
+- [x] save does not hard fail
+- [x] confirmation explains the field change
+- [x] confirmation explains that Henry does not exist and a new row for Henry will also be created
+- [x] after confirming, Henry row exists
+- [x] after confirming, Henry has Member Big = null
+- [x] after confirming, Ben now points to Henry
+- [x] page refreshes automatically
 
-- [ ] Also test canceling and confirm no rows change.
+- [x] Also test canceling and confirm no rows change.
 
 ## 11. Edit Member: Validation
 

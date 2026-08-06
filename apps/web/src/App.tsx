@@ -82,6 +82,7 @@ type ConfirmDialogState =
       cascadeSections: {
         label: string;
         summaryLines: string[];
+        additionalSummaryLines?: string[];
       }[];
     }
   | {
@@ -728,6 +729,7 @@ function App() {
     const cascadeSections: {
       label: string;
       summaryLines: string[];
+      additionalSummaryLines?: string[];
     }[] = [];
 
     if (current.memberName.trim() !== original.memberName.trim()) {
@@ -754,20 +756,35 @@ function App() {
           current.memberName.trim(),
         );
 
-        effectLines.push(
-          `${current.memberName} and all of their descendants will inherit ${current.memberBig.trim()}'s dynasty.`,
-        );
+        if (newBig) {
+          effectLines.push(
+            `${current.memberName} and all of their descendants will inherit ${current.memberBig.trim()}'s dynasty.`,
+          );
 
-        cascadeSections.push({
-          label: `${current.memberName}'s tree: ${
-            descendantNames.length > 0
-              ? [current.memberName, ...descendantNames].join(", ")
-              : current.memberName
-          }`,
-          summaryLines: newBig
-            ? [`Dynasty: ${formatDynasty(original.dynasty)} -> ${formatDynasty(newBig.dynasty)}`]
-            : [],
-        });
+          cascadeSections.push({
+            label: `${current.memberName}'s branch: ${
+              descendantNames.length > 0
+                ? [current.memberName, ...descendantNames].join(", ")
+                : current.memberName
+            }`,
+            summaryLines: [
+              `Dynasty: ${formatDynasty(original.dynasty)} -> ${formatDynasty(newBig.dynasty)}`,
+            ],
+          });
+        } else if (createMissingMentor) {
+          effectLines.push(
+            `${current.memberBig.trim()} does not exist in the database, so a new row for ${current.memberBig.trim()} will also be created.`,
+          );
+          cascadeSections.push({
+            label: `Additional row that will be created for ${current.memberBig.trim()}:`,
+            summaryLines: [
+              `Member Name: ${current.memberBig.trim()}`,
+              "Big: null",
+              `Dynasty: ${formatDynasty(current.dynasty)}`,
+              "Dynasty Head: No",
+            ],
+          });
+        }
       }
     }
 
@@ -819,7 +836,11 @@ function App() {
       );
     }
 
-    if (createMissingMentor && current.memberBig.trim()) {
+    if (
+      createMissingMentor &&
+      current.memberBig.trim() &&
+      current.memberBig.trim() === original.memberBig.trim()
+    ) {
       effectLines.push(
         `${current.memberBig.trim()} does not exist in the database, so a new row for ${current.memberBig.trim()} will also be created.`,
       );
