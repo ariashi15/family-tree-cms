@@ -199,11 +199,11 @@ Verify:
 
 Test:
 
-- [ ] blank Member Name should block save
-- [ ] changing Member Name to another existing member’s name should block save
-- [ ] changing Member Name to a conflicting case-variant should block save
-- [ ] changing Member Big to same as Member Name should block save
-- [ ] invalid dynasty should be impossible via dropdown
+- [x] blank Member Name should block save
+- [x] changing Member Name to another existing member’s name should block save
+- [x] changing Member Name to a conflicting case-variant should block save
+- [x] changing Member Big to same as Member Name should block save
+- [x] invalid dynasty should be impossible via dropdown
 
 ## 12. Delete Member: No Dependents
 

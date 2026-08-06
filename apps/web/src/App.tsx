@@ -1049,7 +1049,6 @@ function App() {
       setEditDialog((currentDialog) =>
         currentDialog ? { ...currentDialog, rowError } : currentDialog,
       );
-      setMembersError(rowError);
       return;
     }
 
@@ -1113,10 +1112,14 @@ function App() {
             ? payload.error
             : "The member could not be updated.";
 
-        setEditDialog((currentDialog) =>
-          currentDialog ? { ...currentDialog, rowError } : currentDialog,
-        );
-        setMembersError(rowError);
+        setEditDialog({
+          memberId: target.id,
+          memberName: target.memberName,
+          memberBig: target.memberBig,
+          dynasty: target.dynasty,
+          isDynastyHead: target.isDynastyHead,
+          rowError,
+        });
         return;
       }
 
@@ -1131,7 +1134,14 @@ function App() {
       setEditDialog(null);
       await loadMembers();
     } catch {
-      setMembersError("The member could not be updated. Please check the API connection.");
+      setEditDialog({
+        memberId: target.id,
+        memberName: target.memberName,
+        memberBig: target.memberBig,
+        dynasty: target.dynasty,
+        isDynastyHead: target.isDynastyHead,
+        rowError: "The member could not be updated. Please check the API connection.",
+      });
     } finally {
       setMembers((currentMembers) =>
         currentMembers.map((member) =>
@@ -1214,6 +1224,15 @@ function App() {
 
     if (!trimmedMemberName) {
       rowError = "Member name is required.";
+    } else if (
+      members.some(
+        (member) =>
+          member.id !== editDialog.memberId &&
+          member.memberName.trim().toLocaleLowerCase() ===
+            trimmedMemberName.toLocaleLowerCase(),
+      )
+    ) {
+      rowError = `${trimmedMemberName} already exists in the database as a member.`;
     } else if (!allowedDynasties.includes(editDialog.dynasty)) {
       rowError = "Dynasty must be fire, water, earth, or wind.";
     } else if (
@@ -1227,7 +1246,6 @@ function App() {
       setEditDialog((currentDialog) =>
         currentDialog ? { ...currentDialog, rowError } : currentDialog,
       );
-      setMembersError(rowError);
       return;
     }
 
@@ -1778,7 +1796,7 @@ function App() {
       {!confirmDialog && editDialog && (
         <div className="dialog-backdrop" role="presentation">
           <div className="dialog-card dialog-card-wide" role="dialog" aria-modal="true">
-            <h2>Edit member</h2>
+            <h2>{`Edit ${editDialog.memberName || "member"}`}</h2>
             <p>Update the fields below, then review the changes before saving.</p>
             <div className="edit-dialog-grid">
               <label className="field-group">
