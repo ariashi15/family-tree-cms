@@ -1,281 +1,324 @@
-# Edit Members QA Plan
+# Edit Members QA Plan — Second Pass Regression
 
-Use this checklist to manually test the Edit Members page and its related behaviors.
+Use this checklist for a full second QA pass after the recent editing, confirmation-dialog, dynasty-cascade, and error-message changes.
 
-## Setup
+## Recommended Setup
 
-Start with a small known dataset in the database:
+Start from a clean known dataset:
 
 - Alice Wong, Member Big = null, Dynasty = Fire, Dynasty Head = Yes
 - Ben Carter, Member Big = Alice Wong, Dynasty = Fire, Dynasty Head = No
 - Clara Diaz, Member Big = Alice Wong, Dynasty = Earth, Dynasty Head = No
 - David Kim, Member Big = null, Dynasty = Water, Dynasty Head = No
+- Eva Stone, Member Big = Ben Carter, Dynasty = Fire, Dynasty Head = No
+- Fiona Reed, Member Big = Eva Stone, Dynasty = Fire, Dynasty Head = No
 
-This gives coverage for:
+This setup gives coverage for:
 
-- [x] members with no mentor
-- [x] multiple people sharing one mentor
-- [x] dynasty cascades across the full family tree
-- [x] rename cascades
-- [x] delete cascades
-- [x] duplicate checks
-- [x] search by member and mentor
+- [ ] search
+- [ ] sorting
+- [ ] add-member flow
+- [ ] edit popup flow
+- [ ] confirm-dialog flow
+- [ ] rename cascades
+- [ ] delete cascades
+- [ ] whole-family-tree dynasty cascades
+- [ ] branch dynasty inheritance when Big changes
+- [ ] missing-Big auto-create behavior
 
-## 1. Page Load And Basic UI
+## 1. Page Load And Table UI
 
 Verify:
 
-- [x] members load successfully
-- [x] rows are sorted alphabetically by first name
-- [x] search bar appears above the table
-- [x] Dynasty displays as Fire, Water, Earth, Wind
-- [x] Dynasty dropdowns are color-coded correctly
-- [x] Dynasty Head dropdowns are color-coded correctly
-- [x] Member Name field appears visually darker than the other text inputs
+- [ ] members load successfully
+- [ ] rows are sorted alphabetically by first name
+- [ ] search bar appears above the table
+- [ ] add form appears above the table
+- [ ] Edit and Delete buttons appear in each row
+- [ ] rows are read-only by default
+- [ ] Dynasty badges show Fire, Water, Earth, Wind with the correct colors
+- [ ] Dynasty Head badges show Yes and No with the correct colors
+- [ ] Member Name text appears visually darker than Member Big text
 
 ## 2. Search
 
 Test:
 
-- [x] search for Alice and confirm Alice’s row appears
-- [x] search for Ben and confirm Ben’s row appears
-- [x] search for Alice Wong and confirm rows with Member Big = Alice Wong also appear
-- [x] search for a mentor name shared across multiple rows and confirm all matching mentees appear
-- [x] search for something nonexistent and confirm the empty-state message appears
-- [x] clear search and confirm full list returns
+- [ ] search for Alice and confirm Alice’s row appears
+- [ ] search for Ben and confirm Ben’s row appears
+- [ ] search for Alice Wong and confirm rows with Member Big = Alice Wong also appear
+- [ ] search for Ben Carter and confirm Eva Stone also appears
+- [ ] search for something nonexistent and confirm the empty-state message appears
+- [ ] clear search and confirm the full list returns
 
 ## 3. Add Member: Happy Paths
 
 Add:
 
-- Member Name = Eva Stone
+- Member Name = Grace Park
 - Member Big = David Kim
 - Dynasty = Wind
 - Dynasty Head = No
 
 Verify:
 
-- [x] confirmation flow behaves correctly
-- [x] row is created
-- [x] page refreshes automatically
-- [x] new row appears in first-name sort order
-- [x] search can find the new member
-- [x] search by David Kim finds Eva too
+- [ ] add succeeds
+- [ ] success behavior is correct
+- [ ] page refreshes automatically
+- [ ] Grace appears in alphabetical order
+- [ ] search finds Grace
+- [ ] search for David Kim also finds Grace
 
-- [x] Also test adding a member with Member Big = null.
+Also test:
 
-## 4. Add Member: Validation
+- [ ] adding a member with Member Big = null
 
-Test:
+## 4. Add Member: Validation Placement
 
-- [x] blank Member Name should block add
-- [x] duplicate Member Name should block add
-- [x] duplicate Member Name with different case should block add
-- [x] Member Big same as Member Name should block add
-- [x] only the four valid dynasties are available in the dropdown
+Test from the Add New Member form:
+
+- [ ] blank Member Name shows "Member name is required." only under the add form
+- [ ] duplicate Member Name shows only under the add form
+- [ ] duplicate Member Name with different case shows only under the add form
+- [ ] Member Big same as Member Name shows only under the add form
+- [ ] none of these messages surface below the editing rules callout
 
 ## 5. Add Member: Missing Mentor Automation
 
 Add:
 
-- Member Name = Fiona Reed
-- Member Big = Greg Hall, where Greg does not yet exist
+- Member Name = Hazel Brooks
+- Member Big = Ian Cole, where Ian does not yet exist
 - Dynasty = Earth
+- Dynasty Head = No
 
 Verify:
 
-- [x] you get a confirmation popup, not a hard error
-- [x] popup explains that Greg does not exist and a new row for Greg will also be created
-- [x] after confirming, Fiona is created
-- [x] after confirming, Greg is created
-- [x] after confirming, Greg has Member Big = null
-- [x] after confirming, Fiona has Member Big = Greg Hall
-- [x] after confirming, the page refreshes automatically
+- [ ] confirmation popup appears instead of a hard error
+- [ ] first section reviews Hazel’s row
+- [ ] popup says Ian does not exist and a new row for Ian will also be created
+- [ ] popup shows a full bullet list for the additional Ian row
+- [ ] additional Ian row shows:
+  - [ ] Member Name
+  - [ ] Big = null
+  - [ ] Dynasty = Earth
+  - [ ] Dynasty Head = No
+- [ ] after confirming, Hazel is created
+- [ ] after confirming, Ian is created
+- [ ] Ian inherits Hazel’s dynasty
+- [ ] page refreshes automatically
 
-- [x] Also test canceling that popup and confirm no rows are created.
+Also test:
 
-## 6. Edit Member: Simple Non-Cascading Changes
+- [ ] canceling the popup creates no rows
 
-Pick a row and change only one field at a time:
+## 6. Edit Popup Basics
 
-- Dynasty Head
-- Member Big from one existing mentor to another existing mentor
+Open Edit on Alice Wong.
+
+Verify:
+
+- [ ] popup title says `Edit Alice Wong`
+- [ ] popup fields are prefilled correctly
+- [ ] popup uses local inline errors, not page-level errors
+- [ ] clicking Review changes opens the confirmation step
+- [ ] clicking Confirm closes the popup immediately
+
+## 7. Edit Validation Before Review
+
+From the edit popup, verify these are blocked before the review dialog opens:
+
+- [ ] blank Member Name
+- [ ] changing Member Name to another existing member’s name
+- [ ] changing Member Name to a case-variant of another existing name
+- [ ] changing Member Big to same as Member Name
+
+Also verify:
+
+- [ ] each error stays inside the popup
+- [ ] none of these errors surface below the editing rules callout
+
+## 8. Edit Member: Simple Non-Cascading Changes
+
+Change only one field at a time:
+
+- [ ] Dynasty Head
+- [ ] Member Big to another existing member
 
 For each, verify:
 
-- [x] confirmation popup appears
-- [x] popup shows only the changed fields
-- [x] save succeeds
-- [x] page refreshes automatically
-- [x] data persists after refresh
+- [ ] review popup opens
+- [ ] popup names the correct member in the first line
+- [ ] popup shows only the relevant changed fields
+- [ ] save succeeds
+- [ ] page refreshes automatically
+- [ ] data persists after refresh
 
-## 7. Edit Member: Dynasty Cascade
+## 9. Edit Member: Rename Without Cascades
 
-Change a member's dynasty:
-
-- Ben Carter: Fire -> Wind
-
-Verify:
-
-- [x] confirmation popup shows Dynasty: Fire -> Wind
-- [x] popup explains that all members of the same family must remain in the same dynasty
-- [x] popup shows a relatives section for Ben Carter
-- [x] save succeeds
-- [x] page refreshes automatically
-- [x] Ben's dynasty becomes Wind
-- [x] Ben's big's dynasty becomes Wind
-- [x] Ben's siblings in the same family tree also update to Wind
-
-Also test a deeper family tree. Add this setup first if needed:
-
-- Eva Stone, Member Big = Ben Carter, Dynasty = Fire, Dynasty Head = No
-- Fiona Reed, Member Big = Eva Stone, Dynasty = Fire, Dynasty Head = No
-
-Then test:
-
-- Alice Wong: Fire -> Water
-
-Verify:
-
-- [x] confirmation popup shows Dynasty: Fire -> Water
-- [x] popup explains that all members of the same family must remain in the same dynasty
-- [x] popup shows one relatives section listing all connected family members who will also update
-- [x] after confirming, Alice's dynasty becomes Water
-- [x] after confirming, Ben's dynasty becomes Water
-- [x] after confirming, Clara's dynasty becomes Water
-- [x] after confirming, Eva's dynasty becomes Water
-- [x] after confirming, Fiona's dynasty becomes Water
-- [x] page refreshes automatically
-
-## 8. Edit Member: Rename Without Cascades
-
-Rename a member who is nobody’s mentor:
+Rename:
 
 - David Kim -> Daniel Kim
 
 Verify:
 
-- [x] confirmation popup shows Member Name: David Kim -> Daniel Kim
-- [x] no cascade sentence appears if nobody references that name
-- [x] save succeeds
-- [x] page refreshes
-- [x] search works for new name, not old one
+- [ ] review popup shows `Member Name: David Kim -> Daniel Kim`
+- [ ] no rename cascade message appears if nobody points to David
+- [ ] save succeeds
+- [ ] page refreshes
+- [ ] search works for Daniel Kim
+- [ ] search no longer works for David Kim
 
-## 9. Edit Member: Rename With Cascades
+## 10. Edit Member: Rename With Cascades
 
-Rename a mentor with dependents:
+Rename:
 
 - Alice Wong -> Alicia Wong
 
 Verify:
 
-- [x] confirmation popup shows Member Name: Alice Wong -> Alicia Wong
-- [x] popup also explains affected rows below the bullets
-- [x] after confirming, Alice is renamed
-- [x] after confirming, Ben’s Member Big becomes Alicia Wong
-- [x] after confirming, Clara’s Member Big becomes Alicia Wong
-- [x] page refreshes automatically
-- [x] search by new mentor name finds dependent rows
+- [ ] review popup shows the direct name change
+- [ ] popup explains the cascading Big updates
+- [ ] after confirming, Alice becomes Alicia
+- [ ] Ben’s Member Big becomes Alicia Wong
+- [ ] Clara’s Member Big becomes Alicia Wong
+- [ ] page refreshes automatically
 
-## 10. Edit Member: Add Missing Mentor Through Edit
+## 11. Edit Member: Dynasty Change Across Whole Family Tree
 
-Change an existing row’s Member Big to a nonexistent person:
+Change:
 
-- Ben Carter Member Big: Alicia Wong -> Henry Cole
+- Alice Wong: Fire -> Water
 
 Verify:
 
-- [x] save does not hard fail
-- [x] confirmation explains the field change
-- [x] confirmation explains that Henry does not exist and a new row for Henry will also be created
-- [x] after confirming, Henry row exists
-- [x] after confirming, Henry has Member Big = null
-- [x] after confirming, Ben now points to Henry
-- [x] page refreshes automatically
+- [ ] review popup shows `Dynasty: Fire -> Water`
+- [ ] popup says all members of the same family must remain in the same dynasty
+- [ ] popup shows one relatives section listing connected family members
+- [ ] after confirming, Alice becomes Water
+- [ ] Ben becomes Water
+- [ ] Clara becomes Water
+- [ ] Eva becomes Water
+- [ ] Fiona becomes Water
+- [ ] page refreshes automatically
 
-- [x] Also test canceling and confirm no rows change.
+## 12. Edit Member: Change Big To Existing Member
 
-## 11. Edit Member: Validation
+Change:
 
-Test:
+- Ben Carter Member Big: Alice Wong -> David Kim
 
-- [x] blank Member Name should block save
-- [x] changing Member Name to another existing member’s name should block save
-- [x] changing Member Name to a conflicting case-variant should block save
-- [x] changing Member Big to same as Member Name should block save
-- [x] invalid dynasty should be impossible via dropdown
+Verify:
 
-## 12. Delete Member: No Dependents
+- [ ] review popup shows the Big change
+- [ ] popup says Ben Carter and all descendants will inherit David Kim’s dynasty
+- [ ] popup shows a branch section for Ben’s branch
+- [ ] branch section includes Ben and descendants
+- [ ] branch section shows the dynasty change bullet
+- [ ] after confirming, Ben’s dynasty becomes David Kim’s dynasty
+- [ ] Eva’s dynasty also becomes David Kim’s dynasty
+- [ ] Fiona’s dynasty also becomes David Kim’s dynasty
+- [ ] Clara does not change just because Ben changed big
+- [ ] page refreshes automatically
+
+## 13. Edit Member: Change Big To Missing Member
+
+Change:
+
+- Ben Carter Member Big: Alice Wong -> Henry Cole
+
+Verify:
+
+- [ ] review popup shows the Big change
+- [ ] popup says Henry Cole does not exist and a new row will be created
+- [ ] popup does not say Ben’s branch will inherit Henry Cole’s dynasty
+- [ ] popup shows a full bullet list for the new Henry Cole row
+- [ ] new Henry Cole row shows:
+  - [ ] Member Name = Henry Cole
+  - [ ] Big = null
+  - [ ] Dynasty = Ben’s current dynasty
+  - [ ] Dynasty Head = No
+- [ ] after confirming, Henry Cole exists
+- [ ] Henry Cole inherits Ben’s dynasty
+- [ ] Ben keeps the expected dynasty
+- [ ] branch dynasty inheritance does not incorrectly pretend Henry’s dynasty already existed
+- [ ] page refreshes automatically
+
+Also test:
+
+- [ ] canceling this popup makes no changes
+
+## 14. Edit Error Placement After Confirm
+
+Use an edit case that fails after confirm, such as a duplicate name attempt.
+
+Verify:
+
+- [ ] the error returns inside the edit popup
+- [ ] the error does not appear below the editing rules callout
+- [ ] the user remains in the popup flow and can fix the issue
+
+## 15. Delete Member: No Dependents
 
 Delete someone with no mentees.
 
 Verify:
 
-- [x] confirmation popup appears
-- [x] it explains the delete
-- [x] after confirming, the row is removed
-- [x] after confirming, the page refreshes automatically
-
-- [x] Also test canceling and confirm no change happens.
-
-## 13. Delete Member: With Dependents
-
-Delete a mentor with active dependents:
-
-- delete Alicia Wong
-
-Verify:
-
-- [x] confirmation explains that dependent rows will have Member Big updated to null
-- [x] after confirming, the mentor row is gone
-- [x] after confirming, all affected dependent rows now have Member Big = null
-- [x] after confirming, the page refreshes automatically
-
-## 14. Refresh Behavior
-
-After each of these actions, confirm the table reflects server state immediately without manual reload:
-
-- [x] add
-- [x] edit
-- [x] edit with dynasty cascades
-- [x] rename with cascades
-- [x] edit with missing mentor auto-create
-- [x] delete
-- [x] delete with dependent nulling
-
-## 15. Bulk Upload Interaction With Editor
-
-After using Bulk Upload:
-
-- [x] confirm success popup appears
-- [x] close popup
-- [x] switch back to Edit Members
-- [x] verify new members exist in table
-- [x] verify sort order still works
-- [x] verify search finds them
-
-## 16. Suggested Edge Cases
+- [ ] delete confirmation popup appears
+- [ ] popup names the correct member
+- [ ] after confirming, the row is removed
+- [ ] page refreshes automatically
 
 Also test:
 
-- [x] extra spaces around names when editing or adding
-- [x] same name entered with different capitalization
-- [x] very long names
-- [x] adding a member whose auto-created mentor later gets edited
-- [x] changing a member's dynasty in the middle of a multi-generation family tree
-- [x] changing a member's dynasty when they have both ancestors and descendants in the same connected tree
-- [x] deleting an auto-created mentor after people point to them
+- [ ] canceling delete makes no change
 
-## Pass Criteria
+## 16. Delete Member: With Dependents
 
-The feature passes if:
+Delete a mentor with dependents.
 
-- [ ] all changes require confirmation
-- [ ] confirmations accurately describe direct edits
-- [ ] automatic follow-on changes are explained in plain language
-- [ ] dynasty changes cascade correctly across the full connected family tree
-- [ ] missing mentors are automated instead of hard-blocked
-- [ ] renames cascade correctly
-- [ ] deletes null out dependent Member Big values
+Verify:
+
+- [ ] confirmation explains that dependent rows will have Member Big set to null
+- [ ] after confirming, the mentor row is gone
+- [ ] affected dependent rows now have Member Big = null
+- [ ] page refreshes automatically
+
+## 17. Bulk Upload Regression Check
+
+Verify:
+
+- [ ] successful bulk upload still shows a success popup
+- [ ] invalid CSV rows still show red row validation states
+- [ ] valid uploaded data appears in Edit Members after switching tabs
+- [ ] sort order still works after bulk upload
+- [ ] search still works after bulk upload
+
+## 18. Refresh Behavior
+
+After each mutation type, confirm the table reflects server state without manual reload:
+
+- [ ] add
+- [ ] edit
+- [ ] rename
+- [ ] dynasty cascade
+- [ ] Big-change dynasty inheritance
+- [ ] missing-Big auto-create
+- [ ] delete
+
+## 19. Final Regression Pass Criteria
+
+The feature passes this second QA round if:
+
+- [ ] all add/edit/delete actions require confirmation
+- [ ] edit validation blocks before review when appropriate
+- [ ] add-form errors stay under the add form
+- [ ] edit errors stay inside the popup flow
+- [ ] no user-correctable edit/add errors surface below the editing rules callout
+- [ ] rename cascades still work
+- [ ] delete cascades still work
+- [ ] dynasty changes cascade across the full connected family tree
+- [ ] Big changes correctly reassign dynasty for the edited member’s branch when the new Big exists
+- [ ] missing Big auto-create behavior is accurate in both data behavior and confirmation copy
+- [ ] search still works on both Member Name and Member Big
 - [ ] list refreshes after every mutation
-- [ ] search works on both Member Name and Member Big
