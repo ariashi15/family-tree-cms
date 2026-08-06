@@ -169,13 +169,13 @@ Rename a mentor with dependents:
 
 Verify:
 
-- [ ] confirmation popup shows Member Name: Alice Wong -> Alicia Wong
-- [ ] popup also explains affected rows below the bullets
-- [ ] after confirming, Alice is renamed
-- [ ] after confirming, Ben’s Member Big becomes Alicia Wong
-- [ ] after confirming, Clara’s Member Big becomes Alicia Wong
-- [ ] page refreshes automatically
-- [ ] search by new mentor name finds dependent rows
+- [x] confirmation popup shows Member Name: Alice Wong -> Alicia Wong
+- [x] popup also explains affected rows below the bullets
+- [x] after confirming, Alice is renamed
+- [x] after confirming, Ben’s Member Big becomes Alicia Wong
+- [x] after confirming, Clara’s Member Big becomes Alicia Wong
+- [x] page refreshes automatically
+- [x] search by new mentor name finds dependent rows
 
 ## 10. Edit Member: Add Missing Mentor Through Edit
 
