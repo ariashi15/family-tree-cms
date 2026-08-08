@@ -44,12 +44,12 @@ Verify:
 
 Test:
 
-- [ ] search for Alice and confirm Alice’s row appears
-- [ ] search for Ben and confirm Ben’s row appears
-- [ ] search for Alice Wong and confirm rows with Member Big = Alice Wong also appear
-- [ ] search for Ben Carter and confirm Eva Stone also appears
-- [ ] search for something nonexistent and confirm the empty-state message appears
-- [ ] clear search and confirm the full list returns
+- [x] search for Alice and confirm Alice’s row appears
+- [x] search for Ben and confirm Ben’s row appears
+- [x] search for Alice Wong and confirm rows with Member Big = Alice Wong also appear
+- [x] search for Ben Carter and confirm Eva Stone also appears
+- [x] search for something nonexistent and confirm the empty-state message appears
+- [x] clear search and confirm the full list returns
 
 ## 3. Add Member: Happy Paths
 
