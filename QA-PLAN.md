@@ -192,15 +192,15 @@ Change:
 
 Verify:
 
-- [ ] review popup shows `Dynasty: Fire -> Water`
-- [ ] popup says all members of the same family must remain in the same dynasty
-- [ ] popup shows one relatives section listing connected family members
-- [ ] after confirming, Alice becomes Water
-- [ ] Ben becomes Water
-- [ ] Clara becomes Water
-- [ ] Eva becomes Water
-- [ ] Fiona becomes Water
-- [ ] page refreshes automatically
+- [x] review popup shows `Dynasty: Fire -> Water`
+- [x] popup says all members of the same family must remain in the same dynasty
+- [x] popup shows one relatives section listing connected family members
+- [x] after confirming, Alice becomes Water
+- [x] Ben becomes Water
+- [x] Clara becomes Water
+- [x] Eva becomes Water
+- [x] Fiona becomes Water
+- [x] page refreshes automatically
 
 ## 12. Edit Member: Change Big To Existing Member
 
