@@ -92,6 +92,12 @@ type ConfirmDialogState =
       effectLines: string[];
     }
   | {
+      type: "create";
+      memberName: string;
+      summaryLines: string[];
+      effectLines: string[];
+    }
+  | {
       type: "create-missing-mentor";
       memberName: string;
       mentorName: string;
@@ -688,6 +694,21 @@ function App() {
     });
   };
 
+  const buildCreateSummary = () => {
+    const trimmedMemberName = newMemberForm.memberName.trim();
+    const trimmedMemberBig = newMemberForm.memberBig.trim();
+
+    return {
+      summaryLines: [
+        `Member Name: ${trimmedMemberName}`,
+        `Big: ${trimmedMemberBig || "null"}`,
+        `Dynasty: ${formatDynasty(newMemberForm.dynasty)}`,
+        `Dynasty Head: ${formatBool(newMemberForm.isDynastyHead)}`,
+      ],
+      effectLines: [] as string[],
+    };
+  };
+
   const openEditDialog = (memberId: string) => {
     const member = members.find((currentMember) => currentMember.id === memberId);
 
@@ -1192,6 +1213,11 @@ function App() {
       return;
     }
 
+    if (currentDialog.type === "create") {
+      await createMember(false);
+      return;
+    }
+
     if (currentDialog.type === "create-missing-mentor") {
       await createMember(true);
       return;
@@ -1402,7 +1428,13 @@ function App() {
                         return;
                       }
 
-                      void createMember(false);
+                      const { summaryLines, effectLines } = buildCreateSummary();
+                      setConfirmDialog({
+                        type: "create",
+                        memberName: newMemberForm.memberName.trim(),
+                        summaryLines,
+                        effectLines,
+                      });
                     }}
                   >
                     {newMemberForm.isSubmitting ? "Adding…" : "Add"}
@@ -1699,13 +1731,16 @@ function App() {
             <h2>
               {confirmDialog.type === "save"
                 ? "Confirm save"
-                : confirmDialog.type === "create-missing-mentor"
+                : confirmDialog.type === "create" ||
+                    confirmDialog.type === "create-missing-mentor"
                   ? "Confirm add"
                   : "Confirm delete"}
             </h2>
             <p>
               {confirmDialog.type === "save"
                 ? `Review the changes for ${confirmDialog.memberName}:`
+                : confirmDialog.type === "create"
+                  ? `Review the row for ${confirmDialog.memberName} that will be added:`
                 : confirmDialog.type === "create-missing-mentor"
                   ? `Review the row for ${confirmDialog.memberName} that will be added:`
                 : `Review the changes that will happen when ${confirmDialog.memberName} is deleted:`}
