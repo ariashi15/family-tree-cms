@@ -1741,7 +1741,7 @@ function App() {
                         <th scope="col">Mentor</th>
                         <th scope="col">Mentee</th>
                         <th scope="col">Dynasty</th>
-                        <th scope="col">Validation</th>
+                        <th scope="col">Valid Formatting?</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1760,7 +1760,9 @@ function App() {
                           <td>{pairing.mentorName}</td>
                           <td>{pairing.menteeName}</td>
                           <td>
-                            <span className="dynasty-pill">{formatDynasty(pairing.dynasty)}</span>
+                            <span className={getDynastyBadgeClass(pairing.dynasty)}>
+                              {formatDynasty(pairing.dynasty)}
+                            </span>
                           </td>
                           <td className="validation-cell">
                             {pairing.errors.length ? (
