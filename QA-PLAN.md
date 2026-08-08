@@ -62,16 +62,16 @@ Add:
 
 Verify:
 
-- [ ] add succeeds
-- [ ] success behavior is correct
-- [ ] page refreshes automatically
-- [ ] Grace appears in alphabetical order
-- [ ] search finds Grace
-- [ ] search for David Kim also finds Grace
+- [x] add succeeds
+- [x] success behavior is correct
+- [x] page refreshes automatically
+- [x] Grace appears in alphabetical order
+- [x] search finds Grace
+- [x] search for David Kim also finds Grace
 
 Also test:
 
-- [ ] adding a member with Member Big = null
+- [x] adding a member with Member Big = null
 
 ## 4. Add Member: Validation Placement
 
