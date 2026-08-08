@@ -210,16 +210,16 @@ Change:
 
 Verify:
 
-- [ ] review popup shows the Big change
-- [ ] popup says Ben Carter and all descendants will inherit David Kim’s dynasty
-- [ ] popup shows a branch section for Ben’s branch
-- [ ] branch section includes Ben and descendants
-- [ ] branch section shows the dynasty change bullet
-- [ ] after confirming, Ben’s dynasty becomes David Kim’s dynasty
-- [ ] Eva’s dynasty also becomes David Kim’s dynasty
-- [ ] Fiona’s dynasty also becomes David Kim’s dynasty
-- [ ] Clara does not change just because Ben changed big
-- [ ] page refreshes automatically
+- [x] review popup shows the Big change
+- [x] popup says Ben Carter and all descendants will inherit David Kim’s dynasty
+- [x] popup shows a branch section for Ben’s branch
+- [x] branch section includes Ben and descendants
+- [x] branch section shows the dynasty change bullet
+- [x] after confirming, Ben’s dynasty becomes David Kim’s dynasty
+- [x] Eva’s dynasty also becomes David Kim’s dynasty
+- [x] Fiona’s dynasty also becomes David Kim’s dynasty
+- [x] Clara does not change just because Ben changed big
+- [x] page refreshes automatically
 
 ## 13. Edit Member: Change Big To Missing Member
 
