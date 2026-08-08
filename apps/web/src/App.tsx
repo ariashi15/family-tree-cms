@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
 
-const expectedColumns = ["mentor_name", "mentee_name", "dynasty"];
+const expectedColumns = ["big_name", "little_name", "dynasty"];
 const allowedDynasties = ["fire", "water", "earth", "wind"] as const;
 const apiUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3000").replace(
   /\/$/,
@@ -13,8 +13,8 @@ type Tab = "members" | "bulk-upload";
 type UploadState = "pending" | "uploaded" | "uploaded-with-skips" | "skipped";
 
 type Pairing = {
-  mentorName: string;
-  menteeName: string;
+  bigName: string;
+  littleName: string;
   dynasty: string;
   rowNumber: number;
   errors: string[];
@@ -25,7 +25,7 @@ type Pairing = {
 type ImportConflict = {
   rowNumber: number;
   memberName: string;
-  role: "mentor" | "mentee";
+  role: "big" | "little";
   message: string;
 };
 
@@ -57,7 +57,7 @@ type MembersResponse = {
 
 type MemberResponse = {
   member: Member;
-  createdMentor?: Member | null;
+  createdbig?: Member | null;
 };
 
 type EditableMember = {
@@ -76,7 +76,7 @@ type ConfirmDialogState =
       type: "save";
       memberId: string;
       memberName: string;
-      createMissingMentor: boolean;
+      createMissingbig: boolean;
       summaryLines: string[];
       detailSections: {
         heading?: string;
@@ -103,9 +103,9 @@ type ConfirmDialogState =
       effectLines: string[];
     }
   | {
-      type: "create-missing-mentor";
+      type: "create-missing-big";
       memberName: string;
-      mentorName: string;
+      bigName: string;
       summaryLines: string[];
       additionalSummaryLines: string[];
       effectLines: string[];
@@ -514,14 +514,14 @@ function App() {
       const mappedPairings = parsedRows.slice(1).map((row, index) => {
         const rowNumber = index + 2;
         const errors: string[] = [];
-        const [mentorName = "", menteeName = "", dynasty = ""] = row;
+        const [bigName = "", littleName = "", dynasty = ""] = row;
 
         if (row.length !== expectedColumns.length) {
           errors.push(`This row has ${row.length} columns; exactly 3 are required.`);
         }
 
-        if (!mentorName || !menteeName || !dynasty) {
-          errors.push("Mentor, mentee, and dynasty are all required.");
+        if (!bigName || !littleName || !dynasty) {
+          errors.push("big, little, and dynasty are all required.");
         }
 
         if (
@@ -534,8 +534,8 @@ function App() {
         }
 
         return {
-          mentorName,
-          menteeName,
+          bigName,
+          littleName,
           dynasty,
           rowNumber,
           errors,
@@ -544,22 +544,22 @@ function App() {
         };
       });
 
-      const menteeRows = new Map<string, Pairing[]>();
+      const littleRows = new Map<string, Pairing[]>();
 
       mappedPairings.forEach((pairing) => {
-        if (!pairing.menteeName) return;
-        const key = pairing.menteeName.toLocaleLowerCase();
-        menteeRows.set(key, [...(menteeRows.get(key) ?? []), pairing]);
+        if (!pairing.littleName) return;
+        const key = pairing.littleName.toLocaleLowerCase();
+        littleRows.set(key, [...(littleRows.get(key) ?? []), pairing]);
       });
 
-      menteeRows.forEach((duplicates) => {
+      littleRows.forEach((duplicates) => {
         if (duplicates.length < 2) return;
 
         const rowNumbers = duplicates.map((pairing) => pairing.rowNumber).join(", ");
 
         duplicates.forEach((pairing) => {
           pairing.errors.push(
-            `${pairing.menteeName} appears on rows ${rowNumbers}. Each mentee may appear only once.`,
+            `${pairing.littleName} appears on rows ${rowNumbers}. Each little may appear only once.`,
           );
         });
       });
@@ -648,8 +648,8 @@ function App() {
         },
         body: JSON.stringify({
           pairings: pairings.map((pairing) => ({
-            mentor_name: pairing.mentorName,
-            mentee_name: pairing.menteeName,
+            big_name: pairing.bigName,
+            little_name: pairing.littleName,
             dynasty: pairing.dynasty,
           })),
         }),
@@ -782,7 +782,7 @@ function App() {
     });
   };
 
-  const buildSaveSummary = (memberId: string, createMissingMentor: boolean) => {
+  const buildSaveSummary = (memberId: string, createMissingbig: boolean) => {
     const current =
       editDialog && editDialog.memberId === memberId
         ? {
@@ -842,7 +842,7 @@ function App() {
               `Dynasty: ${formatDynasty(original.dynasty)} -> ${formatDynasty(newBig.dynasty)}`,
             ],
           });
-        } else if (createMissingMentor) {
+        } else if (createMissingbig) {
           detailSections.push({
             heading: `${current.memberBig.trim()} does not exist in the database, so a new row for ${current.memberBig.trim()} will also be created.`,
             label: `Additional row that will be created for ${current.memberBig.trim()}:`,
@@ -907,7 +907,7 @@ function App() {
     }
 
     if (
-      createMissingMentor &&
+      createMissingbig &&
       current.memberBig.trim() &&
       current.memberBig.trim() === original.memberBig.trim()
     ) {
@@ -981,13 +981,13 @@ function App() {
       trimmedMemberBig &&
       trimmedMemberBig.toLocaleLowerCase() === trimmedMemberName.toLocaleLowerCase()
     ) {
-      return "A member cannot list themself as their own mentor.";
+      return "A member cannot list themself as their own big.";
     }
 
     return "";
   };
 
-  const createMember = async (createMissingMentor: boolean) => {
+  const createMember = async (createMissingbig: boolean) => {
     const trimmedMemberName = newMemberForm.memberName.trim();
     const trimmedMemberBig = newMemberForm.memberBig.trim();
 
@@ -1009,28 +1009,28 @@ function App() {
           member_big: trimmedMemberBig || null,
           dynasty: newMemberForm.dynasty,
           is_dynasty_head: newMemberForm.isDynastyHead === "true",
-          create_missing_mentor: createMissingMentor,
+          create_missing_big: createMissingbig,
         }),
       });
 
       const payload = (await response.json()) as
         | MemberResponse
         | (ApiErrorResponse & {
-            requiresMentorConfirmation?: boolean;
-            missingMentorName?: string;
+            requiresbigConfirmation?: boolean;
+            missingbigName?: string;
           });
 
       if (!response.ok) {
         if (
           response.status === 409 &&
-          "requiresMentorConfirmation" in payload &&
-          payload.requiresMentorConfirmation &&
-          payload.missingMentorName
+          "requiresbigConfirmation" in payload &&
+          payload.requiresbigConfirmation &&
+          payload.missingbigName
         ) {
           setConfirmDialog({
-            type: "create-missing-mentor",
+            type: "create-missing-big",
             memberName: trimmedMemberName,
-            mentorName: payload.missingMentorName,
+            bigName: payload.missingbigName,
             summaryLines: [
               `Member Name: ${trimmedMemberName}`,
               `Big: ${trimmedMemberBig || "null"}`,
@@ -1038,13 +1038,13 @@ function App() {
               `Dynasty Head: ${formatBool(newMemberForm.isDynastyHead)}`,
             ],
             additionalSummaryLines: [
-              `Member Name: ${payload.missingMentorName}`,
+              `Member Name: ${payload.missingbigName}`,
               "Big: null",
               `Dynasty: ${formatDynasty(newMemberForm.dynasty)}`,
               "Dynasty Head: No",
             ],
             effectLines: [
-              `${payload.missingMentorName} does not exist in the database, so a new row for ${payload.missingMentorName} will also be created.`,
+              `${payload.missingbigName} does not exist in the database, so a new row for ${payload.missingbigName} will also be created.`,
             ],
           });
           return;
@@ -1083,7 +1083,7 @@ function App() {
 
   const saveMember = async (
     memberId: string,
-    createMissingMentor = false,
+    createMissingbig = false,
     targetOverride?: MemberDraft,
   ) => {
     const target =
@@ -1113,7 +1113,7 @@ function App() {
       trimmedMemberBig &&
       trimmedMemberBig.toLocaleLowerCase() === trimmedMemberName.toLocaleLowerCase()
     ) {
-      rowError = "A member cannot list themself as their own mentor.";
+      rowError = "A member cannot list themself as their own big.";
     } else if (
       trimmedMemberBig &&
       wouldCreateBigCycle(
@@ -1154,23 +1154,23 @@ function App() {
           member_big: target.memberBig.trim() || null,
           dynasty: target.dynasty,
           is_dynasty_head: target.isDynastyHead === "true",
-          create_missing_mentor: createMissingMentor,
+          create_missing_big: createMissingbig,
         }),
       });
 
       const payload = (await response.json()) as
         | MemberResponse
         | (ApiErrorResponse & {
-            requiresMentorConfirmation?: boolean;
-            missingMentorName?: string;
+            requiresbigConfirmation?: boolean;
+            missingbigName?: string;
           });
 
       if (!response.ok) {
         if (
           response.status === 409 &&
-          "requiresMentorConfirmation" in payload &&
-          payload.requiresMentorConfirmation &&
-          payload.missingMentorName
+          "requiresbigConfirmation" in payload &&
+          payload.requiresbigConfirmation &&
+          payload.missingbigName
         ) {
           const { summaryLines, detailSections } = buildSaveSummary(
             memberId,
@@ -1180,7 +1180,7 @@ function App() {
             type: "save",
             memberId,
             memberName: target.memberName,
-            createMissingMentor: true,
+            createMissingbig: true,
             summaryLines,
             detailSections,
           });
@@ -1279,7 +1279,7 @@ function App() {
       setEditDialog(null);
       await saveMember(
         currentDialog.memberId,
-        currentDialog.createMissingMentor,
+        currentDialog.createMissingbig,
         currentEditDraft,
       );
       return;
@@ -1290,7 +1290,7 @@ function App() {
       return;
     }
 
-    if (currentDialog.type === "create-missing-mentor") {
+    if (currentDialog.type === "create-missing-big") {
       await createMember(true);
       return;
     }
@@ -1322,7 +1322,7 @@ function App() {
       trimmedMemberBig &&
       trimmedMemberBig.toLocaleLowerCase() === trimmedMemberName.toLocaleLowerCase()
     ) {
-      rowError = "A member cannot list themself as their own mentor.";
+      rowError = "A member cannot list themself as their own big.";
     } else if (
       trimmedMemberBig &&
       wouldCreateBigCycle(
@@ -1343,7 +1343,7 @@ function App() {
       return;
     }
 
-    const createMissingMentor =
+    const createMissingbig =
       trimmedMemberBig.length > 0 &&
       !members.some(
         (member) =>
@@ -1354,14 +1354,14 @@ function App() {
 
     const { summaryLines, detailSections } = buildSaveSummary(
       editDialog.memberId,
-      createMissingMentor,
+      createMissingbig,
     );
 
     setConfirmDialog({
       type: "save",
       memberId: editDialog.memberId,
       memberName: editDialog.memberName,
-      createMissingMentor,
+      createMissingbig,
       summaryLines,
       detailSections,
     });
@@ -1379,7 +1379,7 @@ function App() {
         <div className="page-heading">
           <h1>Manage family tree records</h1>
           <p className="intro">
-            Edit individual member data or bulk upload mentor-mentee pairings.
+            Edit individual member data or bulk upload big-little pairings.
           </p>
         </div>
 
@@ -1650,7 +1650,7 @@ function App() {
               <div className="card-heading">
                 <div>
                   <p className="eyebrow">Bulk upload</p>
-                  <h2 id="upload-heading">Upload mentor pairings</h2>
+                  <h2 id="upload-heading">Upload big pairings</h2>
                 </div>
                 <span className="file-type">CSV</span>
               </div>
@@ -1723,8 +1723,8 @@ function App() {
                 </div>
                 <p className="relationship-note">
                   Dynasties must be <code>fire</code>, <code>water</code>,{" "}
-                  <code>earth</code>, or <code>wind</code>. A mentor may appear in
-                  multiple rows. Each mentee should appear only once.
+                  <code>earth</code>, or <code>wind</code>. A big may appear in
+                  multiple rows. Each little should appear only once.
                 </p>
               </div>
 
@@ -1779,8 +1779,8 @@ function App() {
                   <table>
                     <thead>
                       <tr>
-                        <th scope="col">Mentor</th>
-                        <th scope="col">Mentee</th>
+                        <th scope="col">big</th>
+                        <th scope="col">little</th>
                         <th scope="col">Dynasty</th>
                         <th scope="col">Valid Formatting?</th>
                       </tr>
@@ -1788,7 +1788,7 @@ function App() {
                     <tbody>
                       {pairings.map((pairing, index) => (
                         <tr
-                          key={`${pairing.menteeName}-${pairing.mentorName}-${index}`}
+                          key={`${pairing.littleName}-${pairing.bigName}-${index}`}
                           className={
                             pairing.errors.length
                               ? "invalid-row"
@@ -1798,8 +1798,8 @@ function App() {
                                 : ""
                           }
                         >
-                          <td>{pairing.mentorName}</td>
-                          <td>{pairing.menteeName}</td>
+                          <td>{pairing.bigName}</td>
+                          <td>{pairing.littleName}</td>
                           <td>
                             <span className={getDynastyBadgeClass(pairing.dynasty)}>
                               {formatDynasty(pairing.dynasty)}
@@ -1842,7 +1842,7 @@ function App() {
               {confirmDialog.type === "save"
                 ? "Confirm save"
                 : confirmDialog.type === "create" ||
-                    confirmDialog.type === "create-missing-mentor"
+                    confirmDialog.type === "create-missing-big"
                   ? "Confirm add"
                   : "Confirm delete"}
             </h2>
@@ -1864,7 +1864,7 @@ function App() {
                 <p className="dialog-section-label">
                   {confirmDialog.type === "create"
                     ? `Review the row for ${confirmDialog.memberName} that will be added:`
-                    : confirmDialog.type === "create-missing-mentor"
+                    : confirmDialog.type === "create-missing-big"
                       ? `Review the row for ${confirmDialog.memberName} that will be added:`
                       : `Review the changes that will happen when ${confirmDialog.memberName} is deleted:`}
                 </p>
@@ -1885,7 +1885,7 @@ function App() {
                   <div key={line} className="dialog-cascade-section">
                     <p
                       className={
-                        confirmDialog.type === "create-missing-mentor"
+                        confirmDialog.type === "create-missing-big"
                           ? "dialog-section-label"
                           : "dialog-cascade-label"
                       }
@@ -1934,11 +1934,11 @@ function App() {
                 ))}
               </div>
             )}
-            {confirmDialog.type === "create-missing-mentor" &&
+            {confirmDialog.type === "create-missing-big" &&
               confirmDialog.additionalSummaryLines.length > 0 && (
                 <div className="dialog-cascade-section">
                   <p className="dialog-section-label">
-                    {`Additional row that will be created for ${confirmDialog.mentorName}:`}
+                    {`Additional row that will be created for ${confirmDialog.bigName}:`}
                   </p>
                   <ul className="dialog-summary">
                     {confirmDialog.additionalSummaryLines.map((line) => (

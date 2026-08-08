@@ -83,7 +83,7 @@ Test from the Add New Member form:
 - [x] Member Big same as Member Name shows only under the add form
 - [x] none of these messages surface below the editing rules callout
 
-## 5. Add Member: Missing Mentor Automation
+## 5. Add Member: Missing big Automation
 
 Add:
 
@@ -260,7 +260,7 @@ Verify:
 
 ## 15. Delete Member: No Dependents
 
-Delete someone with no mentees.
+Delete someone with no littles.
 
 Verify:
 
@@ -275,12 +275,12 @@ Also test:
 
 ## 16. Delete Member: With Dependents
 
-Delete a mentor with dependents.
+Delete a big with dependents.
 
 Verify:
 
 - [x] confirmation explains that dependent rows will have Member Big set to null
-- [x] after confirming, the mentor row is gone
+- [x] after confirming, the big row is gone
 - [x] affected dependent rows now have Member Big = null
 - [x] page refreshes automatically
 

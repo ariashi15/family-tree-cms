@@ -4,8 +4,8 @@ import express from "express";
 import { createClient } from "@supabase/supabase-js";
 
 type PairingImportRow = {
-  mentor_name: string;
-  mentee_name: string;
+  big_name: string;
+  little_name: string;
   dynasty: string;
 };
 
@@ -16,7 +16,7 @@ type PairingImportRequest = {
 type ImportConflict = {
   rowNumber: number;
   memberName: string;
-  role: "mentor" | "mentee";
+  role: "big" | "little";
   message: string;
 };
 
@@ -46,11 +46,11 @@ type MemberUpdateRequest = {
   member_big: string | null;
   dynasty: string;
   is_dynasty_head: boolean;
-  create_missing_mentor?: boolean;
+  create_missing_big?: boolean;
 };
 
 type MemberCreateRequest = MemberUpdateRequest & {
-  create_missing_mentor?: boolean;
+  create_missing_big?: boolean;
 };
 
 const allowedDynasties = new Set(["fire", "water", "earth", "wind"]);
@@ -132,7 +132,7 @@ app.post("/api/members", async (request, response) => {
   if (creation.member_big) {
     if (creation.member_big.toLocaleLowerCase() === normalizedMemberName) {
       response.status(400).json({
-        error: "A member cannot list themself as their own mentor.",
+        error: "A member cannot list themself as their own big.",
       });
       return;
     }
@@ -164,26 +164,26 @@ app.post("/api/members", async (request, response) => {
     return;
   }
 
-  const mentorName = creation.member_big;
-  const normalizedMentorName = mentorName?.toLocaleLowerCase();
-  const mentorExists = normalizedMentorName
-    ? existingByLowerName.has(normalizedMentorName)
+  const bigName = creation.member_big;
+  const normalizedbigName = bigName?.toLocaleLowerCase();
+  const bigExists = normalizedbigName
+    ? existingByLowerName.has(normalizedbigName)
     : true;
 
-  if (mentorName && !mentorExists && !creation.create_missing_mentor) {
+  if (bigName && !bigExists && !creation.create_missing_big) {
     response.status(409).json({
-      error: `${mentorName} does not exist in the database as a member yet.`,
-      missingMentorName: mentorName,
-      requiresMentorConfirmation: true,
+      error: `${bigName} does not exist in the database as a member yet.`,
+      missingbigName: bigName,
+      requiresbigConfirmation: true,
     });
     return;
   }
 
   const inserts: MemberInsert[] = [];
 
-  if (mentorName && !mentorExists) {
+  if (bigName && !bigExists) {
     inserts.push({
-      member_name: mentorName,
+      member_name: bigName,
       member_big: null,
       dynasty: creation.dynasty,
     });
@@ -213,11 +213,11 @@ app.post("/api/members", async (request, response) => {
 
   response.status(201).json({
     member: createdMember,
-    createdMentor:
-      mentorName && !mentorExists
+    createdbig:
+      bigName && !bigExists
         ? createdMembers.find(
             (member) =>
-              member.member_name.toLocaleLowerCase() === normalizedMentorName,
+              member.member_name.toLocaleLowerCase() === normalizedbigName,
           ) ?? null
         : null,
   });
@@ -291,48 +291,48 @@ app.patch("/api/members/:id", async (request, response) => {
     }
   }
 
-  let createdMentor: MemberRow | null = null;
-  let existingMentor: Pick<MemberRow, "id" | "member_name" | "dynasty"> | null = null;
-  const { create_missing_mentor: createMissingMentor, ...memberUpdates } =
+  let createdbig: MemberRow | null = null;
+  let existingbig: Pick<MemberRow, "id" | "member_name" | "dynasty"> | null = null;
+  const { create_missing_big: createMissingbig, ...memberUpdates } =
     updates;
 
   if (updates.member_big) {
     if (updates.member_big.toLocaleLowerCase() === normalizedMemberName) {
       response.status(400).json({
-        error: "A member cannot list themself as their own mentor.",
+        error: "A member cannot list themself as their own big.",
       });
       return;
     }
 
-    const { data: mentorMembers, error: mentorMembersError } = await supabase
+    const { data: bigMembers, error: bigMembersError } = await supabase
       .from(membersTable)
       .select("id, member_name")
       .ilike("member_name", updates.member_big);
 
-    if (mentorMembersError) {
-      response.status(500).json({ error: mentorMembersError.message });
+    if (bigMembersError) {
+      response.status(500).json({ error: bigMembersError.message });
       return;
     }
 
-    const matchingMentor = (mentorMembers ?? []).find(
+    const matchingbig = (bigMembers ?? []).find(
       (member) =>
         member.member_name.toLocaleLowerCase() ===
         updates.member_big!.toLocaleLowerCase(),
     );
 
-    if (matchingMentor) {
-      const { data: mentorRow, error: mentorRowError } = await supabase
+    if (matchingbig) {
+      const { data: bigRow, error: bigRowError } = await supabase
         .from(membersTable)
         .select("id, member_name, dynasty")
-        .eq("id", matchingMentor.id)
+        .eq("id", matchingbig.id)
         .single();
 
-      if (mentorRowError) {
-        response.status(500).json({ error: mentorRowError.message });
+      if (bigRowError) {
+        response.status(500).json({ error: bigRowError.message });
         return;
       }
 
-      existingMentor = mentorRow as Pick<MemberRow, "id" | "member_name" | "dynasty">;
+      existingbig = bigRow as Pick<MemberRow, "id" | "member_name" | "dynasty">;
     }
 
     const { data: familyRows, error: familyRowsError } = await supabase
@@ -359,17 +359,17 @@ app.patch("/api/members/:id", async (request, response) => {
       return;
     }
 
-    if (!matchingMentor) {
-      if (!createMissingMentor) {
+    if (!matchingbig) {
+      if (!createMissingbig) {
         response.status(409).json({
           error: `${updates.member_big} does not exist in the database as a member yet.`,
-          missingMentorName: updates.member_big,
-          requiresMentorConfirmation: true,
+          missingbigName: updates.member_big,
+          requiresbigConfirmation: true,
         });
         return;
       }
 
-      const { data: createdMentorRows, error: createMentorError } = await supabase
+      const { data: createdbigRows, error: createbigError } = await supabase
         .from(membersTable)
         .insert({
           member_name: updates.member_big,
@@ -378,12 +378,12 @@ app.patch("/api/members/:id", async (request, response) => {
         })
         .select("id, created_at, member_name, member_big, dynasty, is_dynasty_head");
 
-      if (createMentorError) {
-        response.status(500).json({ error: createMentorError.message });
+      if (createbigError) {
+        response.status(500).json({ error: createbigError.message });
         return;
       }
 
-      createdMentor = ((createdMentorRows ?? [])[0] ?? null) as MemberRow | null;
+      createdbig = ((createdbigRows ?? [])[0] ?? null) as MemberRow | null;
     }
   }
 
@@ -426,11 +426,11 @@ app.patch("/api/members/:id", async (request, response) => {
       "id" | "member_name" | "member_big"
     >[];
 
-    if (createdMentor) {
+    if (createdbig) {
       graphMembers.push({
-        id: createdMentor.id,
-        member_name: createdMentor.member_name,
-        member_big: createdMentor.member_big,
+        id: createdbig.id,
+        member_name: createdbig.member_name,
+        member_big: createdbig.member_big,
       });
     }
 
@@ -455,7 +455,7 @@ app.patch("/api/members/:id", async (request, response) => {
   }
 
   if (currentMember.member_big !== updates.member_big && updates.member_big) {
-    if (existingMentor) {
+    if (existingbig) {
       const { data: familyRows, error: familyRowsError } = await supabase
         .from(membersTable)
         .select("id, member_name, member_big");
@@ -480,7 +480,7 @@ app.patch("/api/members/:id", async (request, response) => {
 
       const { error: dynastyInheritanceError } = await supabase
         .from(membersTable)
-        .update({ dynasty: existingMentor.dynasty })
+        .update({ dynasty: existingbig.dynasty })
         .in("id", membersToUpdate);
 
       if (dynastyInheritanceError) {
@@ -492,7 +492,7 @@ app.patch("/api/members/:id", async (request, response) => {
 
   response.json({
     member: data as MemberRow,
-    createdMentor,
+    createdbig,
   });
 });
 
@@ -525,13 +525,13 @@ app.delete("/api/members/:id", async (request, response) => {
     return;
   }
 
-  const { error: clearMentorError } = await supabase
+  const { error: clearbigError } = await supabase
     .from(membersTable)
     .update({ member_big: null })
     .eq("member_big", currentMember.member_name);
 
-  if (clearMentorError) {
-    response.status(500).json({ error: clearMentorError.message });
+  if (clearbigError) {
+    response.status(500).json({ error: clearbigError.message });
     return;
   }
 
@@ -561,7 +561,7 @@ app.post("/api/pairings/import", async (request, response) => {
   if (!pairings) {
     response.status(400).json({
       error:
-        "Request body must be an object with a non-empty pairings array containing mentor_name, mentee_name, and dynasty.",
+        "Request body must be an object with a non-empty pairings array containing big_name, little_name, and dynasty.",
     });
     return;
   }
@@ -569,8 +569,8 @@ app.post("/api/pairings/import", async (request, response) => {
   const memberNames = new Set<string>();
 
   pairings.forEach((pairing) => {
-    memberNames.add(pairing.mentor_name);
-    memberNames.add(pairing.mentee_name);
+    memberNames.add(pairing.big_name);
+    memberNames.add(pairing.little_name);
   });
 
   const { data: existingMembers, error: existingMembersError } = await supabase
@@ -594,21 +594,21 @@ app.post("/api/pairings/import", async (request, response) => {
     const rowNumber = index + 2;
     const skipped: ImportConflict[] = [];
 
-    if (existingNames.has(pairing.mentor_name)) {
+    if (existingNames.has(pairing.big_name)) {
       skipped.push({
         rowNumber,
-        memberName: pairing.mentor_name,
-        role: "mentor",
-        message: `${pairing.mentor_name} already exists in the database as a member.`,
+        memberName: pairing.big_name,
+        role: "big",
+        message: `${pairing.big_name} already exists in the database as a member.`,
       });
     }
 
-    if (existingNames.has(pairing.mentee_name)) {
+    if (existingNames.has(pairing.little_name)) {
       skipped.push({
         rowNumber,
-        memberName: pairing.mentee_name,
-        role: "mentee",
-        message: `${pairing.mentee_name} already exists in the database as a member.`,
+        memberName: pairing.little_name,
+        role: "little",
+        message: `${pairing.little_name} already exists in the database as a member.`,
       });
     }
 
@@ -627,11 +627,11 @@ app.post("/api/pairings/import", async (request, response) => {
     let rowInserted = false;
 
     if (
-      !existingNames.has(pairing.mentor_name) &&
-      !pendingInserts.has(pairing.mentor_name)
+      !existingNames.has(pairing.big_name) &&
+      !pendingInserts.has(pairing.big_name)
     ) {
-      pendingInserts.set(pairing.mentor_name, {
-        member_name: pairing.mentor_name,
+      pendingInserts.set(pairing.big_name, {
+        member_name: pairing.big_name,
         member_big: null,
         dynasty: pairing.dynasty,
       });
@@ -639,12 +639,12 @@ app.post("/api/pairings/import", async (request, response) => {
     }
 
     if (
-      !existingNames.has(pairing.mentee_name) &&
-      !pendingInserts.has(pairing.mentee_name)
+      !existingNames.has(pairing.little_name) &&
+      !pendingInserts.has(pairing.little_name)
     ) {
-      pendingInserts.set(pairing.mentee_name, {
-        member_name: pairing.mentee_name,
-        member_big: pairing.mentor_name,
+      pendingInserts.set(pairing.little_name, {
+        member_name: pairing.little_name,
+        member_big: pairing.big_name,
         dynasty: pairing.dynasty,
       });
       rowInserted = true;
@@ -717,17 +717,17 @@ function parsePairingImportRequest(
       return null;
     }
 
-    const mentorName = getTrimmedString(pairing.mentor_name);
-    const menteeName = getTrimmedString(pairing.mentee_name);
+    const bigName = getTrimmedString(pairing.big_name);
+    const littleName = getTrimmedString(pairing.little_name);
     const dynasty = getTrimmedString(pairing.dynasty);
 
-    if (!mentorName || !menteeName || !dynasty) {
+    if (!bigName || !littleName || !dynasty) {
       return null;
     }
 
     return {
-      mentor_name: mentorName,
-      mentee_name: menteeName,
+      big_name: bigName,
+      little_name: littleName,
       dynasty,
     };
   });
@@ -917,9 +917,9 @@ function parseMemberUpdateRequest(value: unknown): MemberUpdateRequest | null {
     member_big: memberBig,
     dynasty,
     is_dynasty_head: isDynastyHead,
-    create_missing_mentor:
-      typeof payload.create_missing_mentor === "boolean"
-        ? payload.create_missing_mentor
+    create_missing_big:
+      typeof payload.create_missing_big === "boolean"
+        ? payload.create_missing_big
         : false,
   };
 }
@@ -932,11 +932,11 @@ function parseMemberCreateRequest(value: unknown): MemberCreateRequest | null {
   }
 
   const payload = value as Record<string, unknown>;
-  const createMissingMentor = payload.create_missing_mentor;
+  const createMissingbig = payload.create_missing_big;
 
   return {
     ...parsedUpdate,
-    create_missing_mentor:
-      typeof createMissingMentor === "boolean" ? createMissingMentor : false,
+    create_missing_big:
+      typeof createMissingbig === "boolean" ? createMissingbig : false,
   };
 }

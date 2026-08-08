@@ -75,7 +75,7 @@ The backend currently exposes these endpoints:
 
 - `GET /api/health` returns API status and whether Supabase is configured
 - `GET /api/members` returns rows from the members table
-- `POST /api/pairings/import` creates missing mentor and mentee rows
+- `POST /api/pairings/import` creates missing big and little rows
 
 `POST /api/pairings/import` expects this JSON body:
 
@@ -83,8 +83,8 @@ The backend currently exposes these endpoints:
 {
   "pairings": [
     {
-      "mentor_name": "Maya Thompson",
-      "mentee_name": "Jordan Lee",
+      "big_name": "Maya Thompson",
+      "little_name": "Jordan Lee",
       "dynasty": "fire"
     }
   ]
@@ -93,15 +93,15 @@ The backend currently exposes these endpoints:
 
 Import behavior:
 
-- If a mentor already exists as `member_name`, that person is skipped and
+- If a big already exists as `member_name`, that person is skipped and
   reported back to the CMS.
-- If a mentee already exists as `member_name`, that person is skipped and
+- If a little already exists as `member_name`, that person is skipped and
   reported back to the CMS.
-- If a mentor is missing, a row is created with `member_big` set to `null`.
-- If a mentee is missing, a row is created with `member_big` set to the
-  pairing's mentor name.
-- A pairing can partially succeed. For example, an existing mentor can be
-  skipped while a new mentee from the same row is still inserted.
+- If a big is missing, a row is created with `member_big` set to `null`.
+- If a little is missing, a row is created with `member_big` set to the
+  pairing's big name.
+- A pairing can partially succeed. For example, an existing big can be
+  skipped while a new little from the same row is still inserted.
 
 ## Build and production start
 
