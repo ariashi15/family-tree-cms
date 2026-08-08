@@ -128,15 +128,15 @@ Verify:
 
 From the edit popup, verify these are blocked before the review dialog opens:
 
-- [ ] blank Member Name
-- [ ] changing Member Name to another existing member’s name
-- [ ] changing Member Name to a case-variant of another existing name
-- [ ] changing Member Big to same as Member Name
+- [x] blank Member Name
+- [x] changing Member Name to another existing member’s name
+- [x] changing Member Name to a case-variant of another existing name
+- [x] changing Member Big to same as Member Name
 
 Also verify:
 
-- [ ] each error stays inside the popup
-- [ ] none of these errors surface below the editing rules callout
+- [x] each error stays inside the popup
+- [x] none of these errors surface below the editing rules callout
 
 ## 8. Edit Member: Simple Non-Cascading Changes
 
