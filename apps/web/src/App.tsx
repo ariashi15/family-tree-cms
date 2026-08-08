@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { DragEvent } from "react";
+import type { DragEvent, FormEvent } from "react";
 
 const expectedColumns = ["big_name", "little_name", "dynasty"];
 const allowedDynasties = ["fire", "water", "earth", "wind"] as const;
@@ -150,6 +150,12 @@ type MemberDraft = {
 };
 
 type BigSuggestionTarget = "add" | "edit" | null;
+
+type LoginFormState = {
+  email: string;
+  password: string;
+  error: string;
+};
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} bytes`;
@@ -427,6 +433,12 @@ function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [activeBigSuggestionTarget, setActiveBigSuggestionTarget] =
     useState<BigSuggestionTarget>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginForm, setLoginForm] = useState<LoginFormState>({
+    email: "",
+    password: "",
+    error: "",
+  });
 
   useEffect(() => {
     void loadMembers();
@@ -739,6 +751,24 @@ function App() {
     }
 
     setActiveBigSuggestionTarget(null);
+  };
+
+  const handleLoginSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!loginForm.email.trim() || !loginForm.password) {
+      setLoginForm((currentForm) => ({
+        ...currentForm,
+        error: "Enter your email and password to continue.",
+      }));
+      return;
+    }
+
+    setLoginForm((currentForm) => ({
+      ...currentForm,
+      error: "",
+    }));
+    setIsAuthenticated(true);
   };
 
   const resetNewMemberForm = () => {
@@ -1375,6 +1405,67 @@ function App() {
         </a>
       </header>
 
+      {!isAuthenticated ? (
+        <main className="auth-shell">
+          <section className="auth-card" aria-labelledby="login-heading">
+            <p className="eyebrow">Sign in</p>
+            <h1 id="login-heading" className="auth-heading">
+              Access the family tree CMS
+            </h1>
+            <p className="auth-copy">
+              Sign in to manage member records and bulk uploads. Authentication is
+              still a placeholder for now, but the final version will only allow a
+              specific approved set of users.
+            </p>
+
+            <form className="auth-form" onSubmit={handleLoginSubmit}>
+              <label className="field-group">
+                <span>Email</span>
+                <input
+                  className="cell-input"
+                  type="email"
+                  autoComplete="email"
+                  value={loginForm.email}
+                  onChange={(event) =>
+                    setLoginForm((currentForm) => ({
+                      ...currentForm,
+                      email: event.target.value,
+                      error: "",
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="field-group">
+                <span>Password</span>
+                <input
+                  className="cell-input"
+                  type="password"
+                  autoComplete="current-password"
+                  value={loginForm.password}
+                  onChange={(event) =>
+                    setLoginForm((currentForm) => ({
+                      ...currentForm,
+                      password: event.target.value,
+                      error: "",
+                    }))
+                  }
+                />
+              </label>
+
+              {loginForm.error && (
+                <p className="error-message inline-error" role="alert">
+                  {loginForm.error}
+                </p>
+              )}
+
+              <button className="continue-button auth-submit" type="submit">
+                Sign in
+              </button>
+            </form>
+          </section>
+        </main>
+      ) : (
       <main className="layout-shell">
         <div className="page-heading">
           <h1>Manage family tree records</h1>
@@ -1834,6 +1925,7 @@ function App() {
           </>
         )}
       </main>
+      )}
 
       {confirmDialog && (
         <div className="dialog-backdrop" role="presentation">
