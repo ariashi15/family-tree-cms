@@ -162,12 +162,12 @@ Rename:
 
 Verify:
 
-- [ ] review popup shows `Member Name: David Kim -> Daniel Kim`
-- [ ] no rename cascade message appears if nobody points to David
-- [ ] save succeeds
-- [ ] page refreshes
-- [ ] search works for Daniel Kim
-- [ ] search no longer works for David Kim
+- [x] review popup shows `Member Name: David Kim -> Daniel Kim`
+- [x] no rename cascade message appears if nobody points to David
+- [x] save succeeds
+- [x] page refreshes
+- [x] search works for Daniel Kim
+- [x] search no longer works for David Kim
 
 ## 10. Edit Member: Rename With Cascades
 
