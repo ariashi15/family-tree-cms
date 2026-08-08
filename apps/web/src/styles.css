@@ -192,6 +192,7 @@ h1 {
 
 .tab-nav {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 0.4rem;
   padding: 0.35rem;
   margin-bottom: 1.5rem;
@@ -432,6 +433,14 @@ h1 {
   align-items: end;
 }
 
+.admin-user-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.9rem;
+  width: 100%;
+  align-items: end;
+}
+
 .field-group {
   display: flex;
   flex-direction: column;
@@ -476,6 +485,20 @@ h1 {
 .field-action {
   justify-content: flex-end;
   align-items: flex-end;
+}
+
+.admin-user-hint {
+  margin: 0.9rem 0 0;
+  color: #6a7065;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.admin-user-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 .field-group span {
@@ -873,6 +896,15 @@ tbody tr.skipped-row:hover {
   min-width: 15rem;
 }
 
+.admin-email-cell {
+  font-weight: 600;
+}
+
+.admin-user-id-cell {
+  color: #5f685d;
+  font-size: 0.82rem;
+}
+
 .validation-cell ul {
   margin: 0;
   padding-left: 1rem;
@@ -1099,6 +1131,14 @@ tbody tr.skipped-row:hover {
 
   .add-member-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-user-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-actions {
+    flex-direction: column-reverse;
   }
 
   th,

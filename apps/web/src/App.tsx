@@ -10,7 +10,7 @@ const apiUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3000").replace
   "",
 );
 
-type Tab = "members" | "bulk-upload";
+type Tab = "members" | "bulk-upload" | "admin-users";
 
 type UploadState = "pending" | "uploaded" | "uploaded-with-skips" | "skipped";
 
@@ -163,6 +163,22 @@ type LoginFormState = {
 type ApprovedAdmin = {
   email: string;
   adminRole: "super_admin" | "admin";
+};
+
+type AdminUser = {
+  email: string;
+  user_id: string | null;
+  is_active: boolean;
+  admin_role: "super_admin" | "admin";
+};
+
+type AdminUserFormState = {
+  email: string;
+  adminRole: "super_admin" | "admin";
+  isActive: boolean;
+  originalEmail: string | null;
+  error: string;
+  isSubmitting: boolean;
 };
 
 function formatFileSize(bytes: number) {
@@ -410,6 +426,7 @@ function wouldCreateBigCycle(
 
 function App() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const isLocalAuthBypassEnabled = import.meta.env.DEV;
   const [activeTab, setActiveTab] = useState<Tab>("members");
 
   const [members, setMembers] = useState<EditableMember[]>([]);
@@ -444,6 +461,17 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [approvedAdmin, setApprovedAdmin] = useState<ApprovedAdmin | null>(null);
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [adminUsersError, setAdminUsersError] = useState("");
+  const [isAdminUsersLoading, setIsAdminUsersLoading] = useState(false);
+  const [adminUserForm, setAdminUserForm] = useState<AdminUserFormState>({
+    email: "",
+    adminRole: "admin",
+    isActive: true,
+    originalEmail: null,
+    error: "",
+    isSubmitting: false,
+  });
   const [loginForm, setLoginForm] = useState<LoginFormState>({
     email: "",
     error: "",
@@ -553,6 +581,133 @@ function App() {
     setIsAuthLoading(false);
   }
 
+  const resetAdminUserForm = () => {
+    setAdminUserForm({
+      email: "",
+      adminRole: "admin",
+      isActive: true,
+      originalEmail: null,
+      error: "",
+      isSubmitting: false,
+    });
+  };
+
+  async function loadAdminUsers() {
+    if (!supabase || approvedAdmin?.adminRole !== "super_admin") {
+      return;
+    }
+
+    setIsAdminUsersLoading(true);
+    setAdminUsersError("");
+
+    const { data, error } = await supabase
+      .from("admin_users")
+      .select("email, user_id, is_active, admin_role")
+      .order("email", { ascending: true });
+
+    if (error) {
+      setAdminUsersError(
+        "The admin user list could not be loaded. Check the admin_users RLS policies.",
+      );
+      setIsAdminUsersLoading(false);
+      return;
+    }
+
+    setAdminUsers((data ?? []) as AdminUser[]);
+    setIsAdminUsersLoading(false);
+  }
+
+  const openAdminUserForm = (adminUser?: AdminUser) => {
+    if (!adminUser) {
+      resetAdminUserForm();
+      setAdminUsersError("");
+      return;
+    }
+
+    setAdminUserForm({
+      email: adminUser.email,
+      adminRole: adminUser.admin_role,
+      isActive: adminUser.is_active,
+      originalEmail: adminUser.email,
+      error: "",
+      isSubmitting: false,
+    });
+    setAdminUsersError("");
+  };
+
+  const handleAdminUserSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!adminUserForm.email.trim()) {
+      setAdminUserForm((currentForm) => ({
+        ...currentForm,
+        error: "Enter an email address to continue.",
+      }));
+      return;
+    }
+
+    if (!supabase) {
+      setAdminUserForm((currentForm) => ({
+        ...currentForm,
+        error:
+          "Supabase is not configured in the frontend. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in apps/web/.env.",
+        isSubmitting: false,
+      }));
+      return;
+    }
+
+    const trimmedEmail = adminUserForm.email.trim().toLocaleLowerCase();
+
+    setAdminUserForm((currentForm) => ({
+      ...currentForm,
+      email: trimmedEmail,
+      error: "",
+      isSubmitting: true,
+    }));
+    setAdminUsersError("");
+
+    const payload = {
+      email: trimmedEmail,
+      admin_role: adminUserForm.adminRole,
+      is_active: adminUserForm.isActive,
+    };
+
+    const existingAdmin = adminUsers.find((currentAdmin) => currentAdmin.email === trimmedEmail);
+    const targetEmail = adminUserForm.originalEmail ?? existingAdmin?.email ?? trimmedEmail;
+
+    const { error } = adminUserForm.originalEmail || existingAdmin
+      ? await supabase
+          .from("admin_users")
+          .update(payload)
+          .eq("email", targetEmail)
+      : await supabase.from("admin_users").insert(payload);
+
+    if (error) {
+      setAdminUserForm((currentForm) => ({
+        ...currentForm,
+        error:
+          error.message ||
+          "The admin user could not be saved. Check the admin_users RLS policies.",
+        isSubmitting: false,
+      }));
+      return;
+    }
+
+    if (approvedAdmin?.email === trimmedEmail) {
+      if (!adminUserForm.isActive) {
+        await handleSignOut();
+      } else {
+        setApprovedAdmin({
+          email: trimmedEmail,
+          adminRole: adminUserForm.adminRole,
+        });
+      }
+    }
+
+    resetAdminUserForm();
+    await loadAdminUsers();
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -630,6 +785,23 @@ function App() {
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (approvedAdmin?.adminRole === "super_admin" && activeTab === "admin-users") {
+      void loadAdminUsers();
+      return;
+    }
+
+    if (approvedAdmin?.adminRole !== "super_admin") {
+      setAdminUsers([]);
+      setAdminUsersError("");
+      resetAdminUserForm();
+
+      if (activeTab === "admin-users") {
+        setActiveTab("members");
+      }
+    }
+  }, [activeTab, approvedAdmin?.adminRole]);
 
   async function loadMembers() {
     setIsMembersLoading(true);
@@ -1006,6 +1178,21 @@ function App() {
     setIsAuthenticated(false);
     setLoginForm({
       email: "",
+      error: "",
+      success: "",
+      isSubmitting: false,
+    });
+  };
+
+  const handleBypassAuth = () => {
+    setApprovedAdmin({
+      email: "local-test@dev",
+      adminRole: "super_admin",
+    });
+    setIsAuthenticated(true);
+    setIsAuthLoading(false);
+    setLoginForm({
+      email: "local-test@dev",
       error: "",
       success: "",
       isSubmitting: false,
@@ -1712,6 +1899,16 @@ function App() {
                     ? "Sending magic link..."
                     : "Send magic link"}
               </button>
+
+                {isLocalAuthBypassEnabled ? (
+                  <button
+                    className="choose-button auth-bypass"
+                    type="button"
+                    onClick={handleBypassAuth}
+                  >
+                    Bypass auth for local testing
+                  </button>
+                ) : null}
             </form>
           </section>
         </main>
@@ -1739,6 +1936,15 @@ function App() {
           >
             Bulk Upload
           </button>
+          {approvedAdmin?.adminRole === "super_admin" ? (
+            <button
+              className={`tab-button ${activeTab === "admin-users" ? "is-active" : ""}`}
+              type="button"
+              onClick={() => setActiveTab("admin-users")}
+            >
+              Manage Admins
+            </button>
+          ) : null}
         </nav>
 
         {activeTab === "members" ? (
@@ -1985,7 +2191,7 @@ function App() {
               </>
             )}
           </section>
-        ) : (
+        ) : activeTab === "bulk-upload" ? (
           <>
             <section className="upload-card" aria-labelledby="upload-heading">
               <div className="card-heading">
@@ -2172,6 +2378,188 @@ function App() {
                 </div>
               </section>
             )}
+          </>
+        ) : (
+          <>
+            <section className="preview-card" aria-labelledby="admin-users-heading">
+              <div className="preview-heading">
+                <div>
+                  <p className="eyebrow">Superadmin tools</p>
+                  <h2 id="admin-users-heading">Manage admin users</h2>
+                </div>
+                <button className="choose-button" type="button" onClick={() => void loadAdminUsers()}>
+                  Refresh
+                </button>
+              </div>
+
+              <div className="rules-callout" role="note" aria-label="Admin management rules">
+                <strong>Admin management</strong>
+                <ul>
+                  <li>Use this tab to add approved admin users or promote an existing admin to superadmin.</li>
+                  <li>Only the current superadmin can see or edit this tab.</li>
+                  <li><span className="inline-code-label">Active Admin</span> controls whether an admin user currently has admin permissions turned on or not.</li>
+                </ul>
+              </div>
+
+              {adminUsersError && (
+                <p className="error-message panel-message" role="alert">
+                  {adminUsersError}
+                </p>
+              )}
+
+              <div className="add-member-panel">
+                <div className="panel-heading-row">
+                  <div>
+                    <p className="eyebrow">Add or edit</p>
+                    <h3>{adminUserForm.originalEmail ? `Edit ${adminUserForm.originalEmail}` : "Add admin user"}</h3>
+                  </div>
+                  {adminUserForm.originalEmail ? (
+                    <button className="choose-button" type="button" onClick={() => openAdminUserForm()}>
+                      New admin
+                    </button>
+                  ) : null}
+                </div>
+
+                <form className="admin-user-form" onSubmit={(event) => void handleAdminUserSubmit(event)}>
+                  <div className="admin-user-grid">
+                    <label className="field-group">
+                      <span>Email</span>
+                      <input
+                        className="cell-input"
+                        type="email"
+                        autoComplete="email"
+                        value={adminUserForm.email}
+                        disabled={adminUserForm.isSubmitting && adminUserForm.originalEmail !== null}
+                        onChange={(event) =>
+                          setAdminUserForm((currentForm) => ({
+                            ...currentForm,
+                            email: event.target.value,
+                            error: "",
+                          }))
+                        }
+                      />
+                    </label>
+
+                    <label className="field-group">
+                      <span>Role</span>
+                      <select
+                        className="cell-select"
+                        value={adminUserForm.adminRole}
+                        onChange={(event) =>
+                          setAdminUserForm((currentForm) => ({
+                            ...currentForm,
+                            adminRole: event.target.value as "super_admin" | "admin",
+                            error: "",
+                          }))
+                        }
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="super_admin">Super admin</option>
+                      </select>
+                    </label>
+
+                    <label className="field-group">
+                      <span>Active Admin</span>
+                      <select
+                        className="cell-select"
+                        value={adminUserForm.isActive ? "true" : "false"}
+                        onChange={(event) =>
+                          setAdminUserForm((currentForm) => ({
+                            ...currentForm,
+                            isActive: event.target.value === "true",
+                            error: "",
+                          }))
+                        }
+                      >
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                      </select>
+                    </label>
+                  </div>
+                  {adminUserForm.error && (
+                    <p className="error-message inline-error" role="alert">
+                      {adminUserForm.error}
+                    </p>
+                  )}
+
+                  <div className="admin-user-actions">
+                    <button
+                      className="choose-button"
+                      type="button"
+                      onClick={() => openAdminUserForm()}
+                    >
+                      Clear
+                    </button>
+                    <button
+                      className="continue-button"
+                      type="submit"
+                      disabled={adminUserForm.isSubmitting}
+                    >
+                      {adminUserForm.isSubmitting ? "Saving…" : adminUserForm.originalEmail ? "Update admin" : "Add admin"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="preview-card admin-user-list-card" aria-labelledby="admin-user-list-heading">
+                <div className="preview-heading">
+                  <div>
+                    <p className="eyebrow">Current access</p>
+                    <h3 id="admin-user-list-heading">Approved admin users</h3>
+                  </div>
+                  <span className="row-count">{adminUsers.length} {adminUsers.length === 1 ? "user" : "users"}</span>
+                </div>
+
+                {isAdminUsersLoading ? (
+                  <div className="empty-state">Loading admin users…</div>
+                ) : adminUsers.length === 0 ? (
+                  <div className="empty-state">No admin users were found.</div>
+                ) : (
+                  <div className="table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th scope="col">Email</th>
+                          <th scope="col">Role</th>
+                          <th scope="col">Active</th>
+                          <th scope="col">User ID</th>
+                          <th scope="col">Edit</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminUsers.map((adminUser) => (
+                          <tr key={adminUser.email}>
+                            <td className="admin-email-cell">{adminUser.email}</td>
+                            <td>
+                              <span className={`status-pill ${adminUser.admin_role === "super_admin" ? "status-pill-yes" : "status-pill-no"}`}>
+                                {adminUser.admin_role === "super_admin" ? "Super admin" : "Admin"}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`status-pill ${adminUser.is_active ? "status-pill-yes" : "status-pill-no"}`}>
+                                {adminUser.is_active ? "Yes" : "No"}
+                              </span>
+                            </td>
+                            <td className="admin-user-id-cell">
+                              {adminUser.user_id ?? "Not linked yet"}
+                            </td>
+                            <td>
+                              <button
+                                className="row-action row-action-edit"
+                                type="button"
+                                onClick={() => openAdminUserForm(adminUser)}
+                              >
+                                Edit
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </section>
           </>
         )}
       </main>
