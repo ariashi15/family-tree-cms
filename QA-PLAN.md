@@ -94,23 +94,23 @@ Add:
 
 Verify:
 
-- [ ] confirmation popup appears instead of a hard error
-- [ ] first section reviews Hazel’s row
-- [ ] popup says Ian does not exist and a new row for Ian will also be created
-- [ ] popup shows a full bullet list for the additional Ian row
-- [ ] additional Ian row shows:
-  - [ ] Member Name
-  - [ ] Big = null
-  - [ ] Dynasty = Earth
-  - [ ] Dynasty Head = No
-- [ ] after confirming, Hazel is created
-- [ ] after confirming, Ian is created
-- [ ] Ian inherits Hazel’s dynasty
-- [ ] page refreshes automatically
+- [x] confirmation popup appears instead of a hard error
+- [x] first section reviews Hazel’s row
+- [x] popup says Ian does not exist and a new row for Ian will also be created
+- [x] popup shows a full bullet list for the additional Ian row
+- [x] additional Ian row shows:
+  - [x] Member Name
+  - [x] Big = null
+  - [x] Dynasty = Earth
+  - [x] Dynasty Head = No
+- [x] after confirming, Hazel is created
+- [x] after confirming, Ian is created
+- [x] Ian inherits Hazel’s dynasty
+- [x] page refreshes automatically
 
 Also test:
 
-- [ ] canceling the popup creates no rows
+- [x] canceling the popup creates no rows
 
 ## 6. Edit Popup Basics
 
