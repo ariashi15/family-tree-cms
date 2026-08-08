@@ -826,7 +826,7 @@ tbody tr.skipped-row:hover {
 }
 
 .row-error {
-  margin: 0.45rem 0 0;
+  margin: 0.2rem 0 0;
   color: #9f342e;
   font-size: 0.76rem;
   line-height: 1.4;
@@ -952,7 +952,6 @@ tbody tr.skipped-row:hover {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.9rem;
-  margin-bottom: 1rem;
 }
 
 .visually-hidden {

@@ -335,6 +335,30 @@ app.patch("/api/members/:id", async (request, response) => {
       existingMentor = mentorRow as Pick<MemberRow, "id" | "member_name" | "dynasty">;
     }
 
+    const { data: familyRows, error: familyRowsError } = await supabase
+      .from(membersTable)
+      .select("id, member_name, member_big");
+
+    if (familyRowsError) {
+      response.status(500).json({ error: familyRowsError.message });
+      return;
+    }
+
+    const wouldCreateCycle = createsBigCycle(
+      (familyRows ?? []) as Pick<MemberRow, "id" | "member_name" | "member_big">[],
+      memberId,
+      updates.member_name,
+      updates.member_big,
+    );
+
+    if (wouldCreateCycle) {
+      response.status(400).json({
+        error:
+          "That big would create a cycle in the family tree. A member cannot become their own ancestor or descendant.",
+      });
+      return;
+    }
+
     if (!matchingMentor) {
       if (!createMissingMentor) {
         response.status(409).json({
@@ -842,6 +866,28 @@ function getDescendantFamilyMembers(
   visited.delete(normalizedRootMemberId);
 
   return nodes.filter((member) => visited.has(member.id));
+}
+
+function createsBigCycle(
+  members: Pick<MemberRow, "id" | "member_name" | "member_big">[],
+  rootMemberId: string,
+  updatedMemberName: string,
+  proposedBigName: string,
+) {
+  const normalizedProposedBigName = proposedBigName.trim().toLocaleLowerCase();
+
+  if (!normalizedProposedBigName) return false;
+
+  const descendantMembers = getDescendantFamilyMembers(
+    members,
+    rootMemberId,
+    updatedMemberName,
+  );
+
+  return descendantMembers.some(
+    (member) =>
+      member.member_name.trim().toLocaleLowerCase() === normalizedProposedBigName,
+  );
 }
 
 function parseMemberUpdateRequest(value: unknown): MemberUpdateRequest | null {

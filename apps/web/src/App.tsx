@@ -375,6 +375,25 @@ function getDescendantRelativeNames(
     .sort((left, right) => left.localeCompare(right));
 }
 
+function wouldCreateBigCycle(
+  members: EditableMember[],
+  rootMemberId: string,
+  updatedMemberName: string,
+  proposedBigName: string,
+) {
+  const normalizedProposedBigName = proposedBigName.trim().toLocaleLowerCase();
+
+  if (!normalizedProposedBigName) return false;
+
+  const descendantNames = getDescendantRelativeNames(
+    members,
+    rootMemberId,
+    updatedMemberName,
+  ).map((name) => name.trim().toLocaleLowerCase());
+
+  return descendantNames.includes(normalizedProposedBigName);
+}
+
 function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<Tab>("members");
@@ -1095,6 +1114,17 @@ function App() {
       trimmedMemberBig.toLocaleLowerCase() === trimmedMemberName.toLocaleLowerCase()
     ) {
       rowError = "A member cannot list themself as their own mentor.";
+    } else if (
+      trimmedMemberBig &&
+      wouldCreateBigCycle(
+        members,
+        target.id,
+        trimmedMemberName,
+        trimmedMemberBig,
+      )
+    ) {
+      rowError =
+        "That big would create a cycle in the family tree. A member cannot become their own ancestor or descendant.";
     }
 
     if (rowError) {
@@ -1293,6 +1323,17 @@ function App() {
       trimmedMemberBig.toLocaleLowerCase() === trimmedMemberName.toLocaleLowerCase()
     ) {
       rowError = "A member cannot list themself as their own mentor.";
+    } else if (
+      trimmedMemberBig &&
+      wouldCreateBigCycle(
+        members,
+        editDialog.memberId,
+        trimmedMemberName,
+        trimmedMemberBig,
+      )
+    ) {
+      rowError =
+        "That big would create a cycle in the family tree. A member cannot become their own ancestor or descendant.";
     }
 
     if (rowError) {
