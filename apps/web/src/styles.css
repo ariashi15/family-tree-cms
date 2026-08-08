@@ -743,11 +743,14 @@ tbody tr.skipped-row:hover {
 .cell-select {
   width: 100%;
   min-width: 9rem;
+  min-height: 2.85rem;
   padding: 0.68rem 0.75rem;
   border: 1px solid #d1d7cb;
   border-radius: 0.6rem;
   color: #2b322a;
   background: #fcfdfb;
+  font-size: 0.95rem;
+  line-height: 1.4;
 }
 
 .cell-select {
