@@ -30,15 +30,15 @@ This setup gives coverage for:
 
 Verify:
 
-- [ ] members load successfully
-- [ ] rows are sorted alphabetically by first name
-- [ ] search bar appears above the table
-- [ ] add form appears above the table
-- [ ] Edit and Delete buttons appear in each row
-- [ ] rows are read-only by default
-- [ ] Dynasty badges show Fire, Water, Earth, Wind with the correct colors
-- [ ] Dynasty Head badges show Yes and No with the correct colors
-- [ ] Member Name text appears visually darker than Member Big text
+- [x] members load successfully
+- [x] rows are sorted alphabetically by first name
+- [x] search bar appears above the table
+- [x] add form appears above the table
+- [x] Edit and Delete buttons appear in each row
+- [x] rows are read-only by default
+- [x] Dynasty badges show Fire, Water, Earth, Wind with the correct colors
+- [x] Dynasty Head badges show Yes and No with the correct colors
+- [x] Member Name text appears visually darker than Member Big text
 
 ## 2. Search
 
