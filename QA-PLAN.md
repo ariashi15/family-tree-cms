@@ -177,12 +177,12 @@ Rename:
 
 Verify:
 
-- [ ] review popup shows the direct name change
-- [ ] popup explains the cascading Big updates
-- [ ] after confirming, Alice becomes Alicia
-- [ ] Ben’s Member Big becomes Alicia Wong
-- [ ] Clara’s Member Big becomes Alicia Wong
-- [ ] page refreshes automatically
+- [x] review popup shows the direct name change
+- [x] popup explains the cascading Big updates
+- [x] after confirming, Alice becomes Alicia
+- [x] Ben’s Member Big becomes Alicia Wong
+- [x] Clara’s Member Big becomes Alicia Wong
+- [x] page refreshes automatically
 
 ## 11. Edit Member: Dynasty Change Across Whole Family Tree
 
