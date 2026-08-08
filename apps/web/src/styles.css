@@ -420,12 +420,13 @@ h1 {
 
 .add-member-button {
   width: 7rem;
-  align-self: flex-start;
+  min-height: 2.85rem;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .add-member-button {
   width: 7rem;
-  align-self: flex-start;
 }
 
 .search-row {
