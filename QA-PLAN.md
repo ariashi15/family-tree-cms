@@ -142,17 +142,17 @@ Also verify:
 
 Change only one field at a time:
 
-- [ ] Dynasty Head
-- [ ] Member Big to another existing member
+- [x] Dynasty Head
+- [x] Member Big to another existing member
 
 For each, verify:
 
-- [ ] review popup opens
-- [ ] popup names the correct member in the first line
-- [ ] popup shows only the relevant changed fields
-- [ ] save succeeds
-- [ ] page refreshes automatically
-- [ ] data persists after refresh
+- [x] review popup opens
+- [x] popup names the correct member in the first line
+- [x] popup shows only the relevant changed fields
+- [x] save succeeds
+- [x] page refreshes automatically
+- [x] data persists after refresh
 
 ## 9. Edit Member: Rename Without Cascades
 
