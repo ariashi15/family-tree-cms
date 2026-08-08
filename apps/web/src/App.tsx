@@ -90,6 +90,11 @@ type ConfirmDialogState =
       memberName: string;
       summaryLines: string[];
       effectLines: string[];
+      detailSections: {
+        heading?: string;
+        label: string;
+        summaryLines: string[];
+      }[];
     }
   | {
       type: "create";
@@ -820,9 +825,10 @@ function App() {
       );
 
       if (affectedRows.length > 0) {
+        const affectedNames = affectedRows.map((member) => member.memberName).join(", ");
         detailSections.push({
-          heading: `${affectedRows.length} ${affectedRows.length === 1 ? "row" : "rows"} will update Big from ${original.memberName} to ${current.memberName}.`,
-          label: "",
+          heading: `The following rows will update Big from ${original.memberName} to ${current.memberName}:`,
+          label: affectedNames,
           summaryLines: [],
         });
       }
@@ -869,10 +875,15 @@ function App() {
   const buildDeleteSummary = (memberId: string) => {
     const current = members.find((member) => member.id === memberId);
 
-    if (!current) return { summaryLines: [], effectLines: [] };
+    if (!current) return { summaryLines: [], effectLines: [], detailSections: [] };
 
     const summaryLines = [`Delete row for ${current.memberName}.`];
     const effectLines: string[] = [];
+    const detailSections: {
+      heading?: string;
+      label: string;
+      summaryLines: string[];
+    }[] = [];
     const affectedRows = members.filter(
       (member) =>
         member.id !== memberId &&
@@ -881,12 +892,14 @@ function App() {
     );
 
     if (affectedRows.length > 0) {
-      effectLines.push(
-        `${affectedRows.length} ${affectedRows.length === 1 ? "row" : "rows"} will update Big from ${current.memberName} to null.`,
-      );
+      detailSections.push({
+        heading: `The following rows will update Big from ${current.memberName} to null:`,
+        label: "",
+        summaryLines: affectedRows.map((member) => member.memberName),
+      });
     }
 
-    return { summaryLines, effectLines };
+    return { summaryLines, effectLines, detailSections };
   };
 
   const validateNewMemberForm = () => {
@@ -1776,6 +1789,25 @@ function App() {
                     >
                       {line}
                     </p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {confirmDialog.type === "delete" && confirmDialog.detailSections.length > 0 && (
+              <div className="dialog-cascade-sections">
+                {confirmDialog.detailSections.map((section, index) => (
+                  <div key={`${section.heading ?? section.label}-${index}`} className="dialog-cascade-section">
+                    {section.heading && (
+                      <p className="dialog-section-label">{section.heading}</p>
+                    )}
+                    {section.label && <p className="dialog-cascade-label">{section.label}</p>}
+                    {section.summaryLines.length > 0 && (
+                      <ul className="dialog-summary">
+                        {section.summaryLines.map((line) => (
+                          <li key={`${section.heading ?? section.label}-${line}`}>{line}</li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 ))}
               </div>
