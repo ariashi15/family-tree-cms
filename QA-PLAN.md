@@ -288,23 +288,23 @@ Verify:
 
 Verify:
 
-- [ ] successful bulk upload still shows a success popup
-- [ ] invalid CSV rows still show red row validation states
-- [ ] valid uploaded data appears in Edit Members after switching tabs
-- [ ] sort order still works after bulk upload
-- [ ] search still works after bulk upload
+- [x] successful bulk upload still shows a success popup
+- [x] invalid CSV rows still show red row validation states
+- [x] valid uploaded data appears in Edit Members after switching tabs
+- [x] sort order still works after bulk upload
+- [x] search still works after bulk upload
 
 ## 18. Refresh Behavior
 
 After each mutation type, confirm the table reflects server state without manual reload:
 
-- [ ] add
-- [ ] edit
-- [ ] rename
-- [ ] dynasty cascade
-- [ ] Big-change dynasty inheritance
-- [ ] missing-Big auto-create
-- [ ] delete
+- [x] add
+- [x] edit
+- [x] rename
+- [x] dynasty cascade
+- [x] Big-change dynasty inheritance
+- [x] missing-Big auto-create
+- [x] delete
 
 ## 19. Final Regression Pass Criteria
 
