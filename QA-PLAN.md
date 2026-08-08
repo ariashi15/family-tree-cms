@@ -77,11 +77,11 @@ Also test:
 
 Test from the Add New Member form:
 
-- [ ] blank Member Name shows "Member name is required." only under the add form
-- [ ] duplicate Member Name shows only under the add form
-- [ ] duplicate Member Name with different case shows only under the add form
-- [ ] Member Big same as Member Name shows only under the add form
-- [ ] none of these messages surface below the editing rules callout
+- [x] blank Member Name shows "Member name is required." only under the add form
+- [x] duplicate Member Name shows only under the add form
+- [x] duplicate Member Name with different case shows only under the add form
+- [x] Member Big same as Member Name shows only under the add form
+- [x] none of these messages surface below the editing rules callout
 
 ## 5. Add Member: Missing Mentor Automation
 
