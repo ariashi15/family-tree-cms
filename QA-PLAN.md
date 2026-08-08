@@ -118,11 +118,11 @@ Open Edit on Alice Wong.
 
 Verify:
 
-- [ ] popup title says `Edit Alice Wong`
-- [ ] popup fields are prefilled correctly
-- [ ] popup uses local inline errors, not page-level errors
-- [ ] clicking Review changes opens the confirmation step
-- [ ] clicking Confirm closes the popup immediately
+- [x] popup title says `Edit Alice Wong`
+- [x] popup fields are prefilled correctly
+- [x] popup uses local inline errors, not page-level errors
+- [x] clicking Review changes opens the confirmation step
+- [x] clicking Confirm closes the popup immediately
 
 ## 7. Edit Validation Before Review
 
