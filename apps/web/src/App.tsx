@@ -78,8 +78,8 @@ type ConfirmDialogState =
       memberName: string;
       createMissingMentor: boolean;
       summaryLines: string[];
-      effectLines: string[];
-      cascadeSections: {
+      detailSections: {
+        heading?: string;
         label: string;
         summaryLines: string[];
       }[];
@@ -738,12 +738,12 @@ function App() {
     const original = memberSnapshots[memberId];
 
     if (!current || !original) {
-      return { summaryLines: [], effectLines: [], cascadeSections: [] };
+      return { summaryLines: [], detailSections: [] };
     }
 
     const summaryLines: string[] = [];
-    const effectLines: string[] = [];
-    const cascadeSections: {
+    const detailSections: {
+      heading?: string;
       label: string;
       summaryLines: string[];
     }[] = [];
@@ -773,11 +773,8 @@ function App() {
         );
 
         if (newBig) {
-          effectLines.push(
-            `${current.memberName} and all of their descendants will inherit ${current.memberBig.trim()}'s dynasty.`,
-          );
-
-          cascadeSections.push({
+          detailSections.push({
+            heading: `${current.memberName} and all of their descendants will inherit ${current.memberBig.trim()}'s dynasty.`,
             label: `${current.memberName}'s branch: ${
               descendantNames.length > 0
                 ? [current.memberName, ...descendantNames].join(", ")
@@ -788,10 +785,8 @@ function App() {
             ],
           });
         } else if (createMissingMentor) {
-          effectLines.push(
-            `${current.memberBig.trim()} does not exist in the database, so a new row for ${current.memberBig.trim()} will also be created.`,
-          );
-          cascadeSections.push({
+          detailSections.push({
+            heading: `${current.memberBig.trim()} does not exist in the database, so a new row for ${current.memberBig.trim()} will also be created.`,
             label: `Additional row that will be created for ${current.memberBig.trim()}:`,
             summaryLines: [
               `Member Name: ${current.memberBig.trim()}`,
@@ -825,9 +820,11 @@ function App() {
       );
 
       if (affectedRows.length > 0) {
-        effectLines.push(
-          `${affectedRows.length} ${affectedRows.length === 1 ? "row" : "rows"} will update Big from ${original.memberName} to ${current.memberName}.`,
-        );
+        detailSections.push({
+          heading: `${affectedRows.length} ${affectedRows.length === 1 ? "row" : "rows"} will update Big from ${original.memberName} to ${current.memberName}.`,
+          label: "",
+          summaryLines: [],
+        });
       }
     }
 
@@ -840,16 +837,14 @@ function App() {
         current.memberBig.trim(),
       );
 
-      cascadeSections.push({
+      detailSections.push({
+        heading:
+          "All members of the same family must remain in the same dynasty, so the following updates will also be made:",
         label: `${current.memberName}'s relatives: ${
           relativeNames.length > 0 ? relativeNames.join(", ") : "N/A"
         }`,
         summaryLines: relativeNames.length > 0 ? [dynastyChangeLine] : [],
       });
-
-      effectLines.push(
-        "All members of the same family must remain in the same dynasty, so the following updates will also be made:",
-      );
     }
 
     if (
@@ -857,16 +852,17 @@ function App() {
       current.memberBig.trim() &&
       current.memberBig.trim() === original.memberBig.trim()
     ) {
-      effectLines.push(
-        `${current.memberBig.trim()} does not exist in the database, so a new row for ${current.memberBig.trim()} will also be created.`,
-      );
+      detailSections.push({
+        heading: `${current.memberBig.trim()} does not exist in the database, so a new row for ${current.memberBig.trim()} will also be created.`,
+        label: "",
+        summaryLines: [],
+      });
     }
 
     return {
       summaryLines:
         summaryLines.length > 0 ? summaryLines : ["No visible field changes."],
-      effectLines,
-      cascadeSections,
+      detailSections,
     };
   };
 
@@ -1099,7 +1095,7 @@ function App() {
           payload.requiresMentorConfirmation &&
           payload.missingMentorName
         ) {
-          const { summaryLines, effectLines, cascadeSections } = buildSaveSummary(
+          const { summaryLines, detailSections } = buildSaveSummary(
             memberId,
             true,
           );
@@ -1109,8 +1105,7 @@ function App() {
             memberName: target.memberName,
             createMissingMentor: true,
             summaryLines,
-            effectLines,
-            cascadeSections,
+            detailSections,
           });
           return;
         }
@@ -1269,7 +1264,7 @@ function App() {
             trimmedMemberBig.toLocaleLowerCase(),
       );
 
-    const { summaryLines, effectLines, cascadeSections } = buildSaveSummary(
+    const { summaryLines, detailSections } = buildSaveSummary(
       editDialog.memberId,
       createMissingMentor,
     );
@@ -1280,8 +1275,7 @@ function App() {
       memberName: editDialog.memberName,
       createMissingMentor,
       summaryLines,
-      effectLines,
-      cascadeSections,
+      detailSections,
     });
   };
 
@@ -1736,46 +1730,64 @@ function App() {
                   ? "Confirm add"
                   : "Confirm delete"}
             </h2>
-            <p>
-              {confirmDialog.type === "save"
-                ? `Review the changes for ${confirmDialog.memberName}:`
-                : confirmDialog.type === "create"
-                  ? `Review the row for ${confirmDialog.memberName} that will be added:`
-                : confirmDialog.type === "create-missing-mentor"
-                  ? `Review the row for ${confirmDialog.memberName} that will be added:`
-                : `Review the changes that will happen when ${confirmDialog.memberName} is deleted:`}
-            </p>
-            {"summaryLines" in confirmDialog && confirmDialog.summaryLines.length > 0 && (
-              <ul className="dialog-summary">
-                {confirmDialog.summaryLines.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
+            {confirmDialog.type === "save" ? (
+              <div className="dialog-cascade-section">
+                <p className="dialog-section-label">
+                  {`Review the changes for ${confirmDialog.memberName}:`}
+                </p>
+                {confirmDialog.summaryLines.length > 0 && (
+                  <ul className="dialog-summary">
+                    {confirmDialog.summaryLines.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : (
+              <div className="dialog-cascade-section">
+                <p className="dialog-section-label">
+                  {confirmDialog.type === "create"
+                    ? `Review the row for ${confirmDialog.memberName} that will be added:`
+                    : confirmDialog.type === "create-missing-mentor"
+                      ? `Review the row for ${confirmDialog.memberName} that will be added:`
+                      : `Review the changes that will happen when ${confirmDialog.memberName} is deleted:`}
+                </p>
+                {"summaryLines" in confirmDialog && confirmDialog.summaryLines.length > 0 && (
+                  <ul className="dialog-summary">
+                    {confirmDialog.summaryLines.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
-            {"effectLines" in confirmDialog && confirmDialog.effectLines.length > 0 && (
+            {confirmDialog.type !== "save" &&
+              "effectLines" in confirmDialog &&
+              confirmDialog.effectLines.length > 0 && (
               <div className="dialog-effects">
                 {confirmDialog.effectLines.map((line) => (
-                  <p
-                    key={line}
-                    className={
-                      confirmDialog.type === "create-missing-mentor" ||
-                      (confirmDialog.type === "save" &&
-                        line ===
-                          "All members of the same family must remain in the same dynasty, so the following updates will also be made:")
-                        ? "dialog-section-label"
-                        : undefined
-                    }
-                  >
-                    {line}
-                  </p>
+                  <div key={line} className="dialog-cascade-section">
+                    <p
+                      className={
+                        confirmDialog.type === "create-missing-mentor"
+                          ? "dialog-section-label"
+                          : "dialog-cascade-label"
+                      }
+                    >
+                      {line}
+                    </p>
+                  </div>
                 ))}
               </div>
             )}
-            {confirmDialog.type === "save" && confirmDialog.cascadeSections.length > 0 && (
+            {confirmDialog.type === "save" && confirmDialog.detailSections.length > 0 && (
               <div className="dialog-cascade-sections">
-                {confirmDialog.cascadeSections.map((section) => (
-                  <div key={section.label} className="dialog-cascade-section">
-                    <p className="dialog-cascade-label">{section.label}</p>
+                {confirmDialog.detailSections.map((section, index) => (
+                  <div key={`${section.label}-${index}`} className="dialog-cascade-section">
+                    {section.heading && (
+                      <p className="dialog-section-label">{section.heading}</p>
+                    )}
+                    {section.label && <p className="dialog-cascade-label">{section.label}</p>}
                     {section.summaryLines.length > 0 && (
                       <ul className="dialog-summary">
                         {section.summaryLines.map((line) => (
@@ -1789,13 +1801,16 @@ function App() {
             )}
             {confirmDialog.type === "create-missing-mentor" &&
               confirmDialog.additionalSummaryLines.length > 0 && (
-                <>
+                <div className="dialog-cascade-section">
+                  <p className="dialog-section-label">
+                    {`Additional row that will be created for ${confirmDialog.mentorName}:`}
+                  </p>
                   <ul className="dialog-summary">
                     {confirmDialog.additionalSummaryLines.map((line) => (
                       <li key={line}>{line}</li>
                     ))}
                   </ul>
-                </>
+                </div>
               )}
             <div className="dialog-actions">
               <button

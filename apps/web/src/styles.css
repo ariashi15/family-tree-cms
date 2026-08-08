@@ -808,6 +808,9 @@ tbody tr.skipped-row:hover {
 
 .dialog-card {
   width: min(100%, 28rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
   padding: 1.5rem;
   border-radius: 1rem;
   background: #fffdf9;
@@ -819,31 +822,36 @@ tbody tr.skipped-row:hover {
 }
 
 .dialog-card h2 {
-  margin-bottom: 0.65rem;
+  margin: 0;
   font-size: 1.2rem;
 }
 
 .dialog-card p {
-  margin-bottom: 1.25rem;
+  margin: 0;
   color: #5f685d;
   line-height: 1.5;
 }
 
 .dialog-section-label {
-  margin-bottom: 1.25rem;
-  color: #5f685d;
+  display: block;
+  margin: 0;
+  padding-bottom: 0.4rem;
+  color: #36443a;
+  font-size: 0.84rem;
+  font-weight: 650;
   line-height: 1.5;
 }
 
 .dialog-cascade-label {
-  margin: 0 0 0.45rem;
+  margin: 0 0 0.55rem;
   color: #5f685d;
+  padding-bottom: 0.4rem;
   font-size: 0.84rem;
   line-height: 1.5;
 }
 
 .dialog-summary {
-  margin: -0.5rem 0 1.25rem;
+  margin: 0;
   padding-left: 1.1rem;
   color: #445046;
   font-size: 0.84rem;
@@ -855,28 +863,48 @@ tbody tr.skipped-row:hover {
 }
 
 .dialog-effects p {
-  margin: 0 0 0.7rem;
+  margin: 0;
   color: #5f685d;
   font-size: 0.84rem;
   line-height: 1.5;
 }
 
 .dialog-effects p.dialog-section-label {
-  margin-bottom: 1.25rem;
-  font-size: 1rem;
-  line-height: 1.5;
+  margin: 0;
 }
 
-.dialog-effects p:last-child {
-  margin-bottom: 1.25rem;
+.dialog-effects {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.dialog-cascade-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.dialog-cascade-section {
+  padding: 0.9rem 1rem;
+  border: 1px solid #e2e7dc;
+  border-radius: 0.85rem;
+  background: #f8faf6;
 }
 
 .dialog-cascade-section + .dialog-cascade-section {
-  margin-top: 0.9rem;
+  margin-top: 0;
 }
 
 .dialog-cascade-section .dialog-summary {
-  margin-top: -0.35rem;
+  margin-bottom: 0;
+}
+
+.dialog-card > .dialog-summary {
+  padding: 0.95rem 1rem 0.95rem 2rem;
+  border: 1px solid #e2e7dc;
+  border-radius: 0.85rem;
+  background: #f8faf6;
 }
 
 .dialog-actions {
