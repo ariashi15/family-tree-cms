@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DragEvent, FormEvent } from "react";
+import type { User } from "@supabase/supabase-js";
+import { isSupabaseConfigured, supabase } from "./lib/supabase";
 
 const expectedColumns = ["big_name", "little_name", "dynasty"];
 const allowedDynasties = ["fire", "water", "earth", "wind"] as const;
@@ -153,8 +155,14 @@ type BigSuggestionTarget = "add" | "edit" | null;
 
 type LoginFormState = {
   email: string;
-  password: string;
   error: string;
+  success: string;
+  isSubmitting: boolean;
+};
+
+type ApprovedAdmin = {
+  email: string;
+  adminRole: "super_admin" | "admin";
 };
 
 function formatFileSize(bytes: number) {
@@ -434,14 +442,193 @@ function App() {
   const [activeBigSuggestionTarget, setActiveBigSuggestionTarget] =
     useState<BigSuggestionTarget>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [approvedAdmin, setApprovedAdmin] = useState<ApprovedAdmin | null>(null);
   const [loginForm, setLoginForm] = useState<LoginFormState>({
     email: "",
-    password: "",
     error: "",
+    success: "",
+    isSubmitting: false,
   });
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setMembers([]);
+      setMemberSnapshots({});
+      setIsMembersLoading(false);
+      return;
+    }
+
     void loadMembers();
+  }, [isAuthenticated]);
+
+  async function verifyAdminAccess(user: User) {
+    if (!supabase) {
+      return {
+        approved: false as const,
+        error:
+          "Supabase is not configured in the frontend. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in apps/web/.env.",
+      };
+    }
+
+    const normalizedEmail = user.email?.trim().toLocaleLowerCase();
+
+    if (!normalizedEmail) {
+      return {
+        approved: false as const,
+        error: "This account does not have an email address, so CMS access cannot be verified.",
+      };
+    }
+
+    const { data, error } = await supabase
+      .from("admin_users")
+      .select("email, user_id, is_active, admin_role")
+      .ilike("email", normalizedEmail)
+      .maybeSingle();
+
+    if (error) {
+      return {
+        approved: false as const,
+        error:
+          "Your account signed in, but the CMS could not verify admin access. Check the admin_users table and its RLS policies.",
+      };
+    }
+
+    if (!data || !data.is_active) {
+      return {
+        approved: false as const,
+        error: "Your account is not approved for CMS access.",
+      };
+    }
+
+    if (data.user_id == null) {
+      await supabase
+        .from("admin_users")
+        .update({ user_id: user.id })
+        .ilike("email", normalizedEmail)
+        .is("user_id", null);
+    }
+
+    return {
+      approved: true as const,
+      admin: {
+        email: normalizedEmail,
+        adminRole: data.admin_role,
+      },
+    };
+  }
+
+  async function applySessionAccess(user: User) {
+    setIsAuthLoading(true);
+
+    const access = await verifyAdminAccess(user);
+
+    if (!access.approved) {
+      setApprovedAdmin(null);
+      setIsAuthenticated(false);
+      setLoginForm((currentForm) => ({
+        ...currentForm,
+        error: access.error,
+        success: "",
+        isSubmitting: false,
+      }));
+
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+
+      setIsAuthLoading(false);
+      return;
+    }
+
+    setApprovedAdmin(access.admin);
+    setIsAuthenticated(true);
+    setLoginForm((currentForm) => ({
+      ...currentForm,
+      email: access.admin.email,
+      error: "",
+      success: "",
+      isSubmitting: false,
+    }));
+    setIsAuthLoading(false);
+  }
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function initializeAuth() {
+      if (!isSupabaseConfigured || !supabase) {
+        if (!isMounted) return;
+        setIsAuthenticated(false);
+        setApprovedAdmin(null);
+        setIsAuthLoading(false);
+        setLoginForm((currentForm) => ({
+          ...currentForm,
+          error:
+            "Supabase is not configured in the frontend. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in apps/web/.env.",
+          success: "",
+          isSubmitting: false,
+        }));
+        return;
+      }
+
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+
+      if (!isMounted) return;
+
+      if (error) {
+        setIsAuthenticated(false);
+        setApprovedAdmin(null);
+        setIsAuthLoading(false);
+        setLoginForm((currentForm) => ({
+          ...currentForm,
+          error: "The current sign-in session could not be loaded. Please request a new magic link.",
+          success: "",
+          isSubmitting: false,
+        }));
+        return;
+      }
+
+      if (!session?.user) {
+        setIsAuthenticated(false);
+        setApprovedAdmin(null);
+        setIsAuthLoading(false);
+        return;
+      }
+
+      await applySessionAccess(session.user);
+    }
+
+    void initializeAuth();
+
+    if (!supabase) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+
+      if (!session?.user) {
+        setApprovedAdmin(null);
+        setIsAuthenticated(false);
+        setIsAuthLoading(false);
+        return;
+      }
+
+      void applySessionAccess(session.user);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function loadMembers() {
@@ -753,13 +940,52 @@ function App() {
     setActiveBigSuggestionTarget(null);
   };
 
-  const handleLoginSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleLoginSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!loginForm.email.trim() || !loginForm.password) {
+    if (!loginForm.email.trim()) {
       setLoginForm((currentForm) => ({
         ...currentForm,
-        error: "Enter your email and password to continue.",
+        error: "Enter your email address to continue.",
+        success: "",
+      }));
+      return;
+    }
+
+    if (!supabase) {
+      setLoginForm((currentForm) => ({
+        ...currentForm,
+        error:
+          "Supabase is not configured in the frontend. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in apps/web/.env.",
+        success: "",
+        isSubmitting: false,
+      }));
+      return;
+    }
+
+    const trimmedEmail = loginForm.email.trim().toLocaleLowerCase();
+
+    setLoginForm((currentForm) => ({
+      ...currentForm,
+      email: trimmedEmail,
+      error: "",
+      success: "",
+      isSubmitting: true,
+    }));
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: trimmedEmail,
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      setLoginForm((currentForm) => ({
+        ...currentForm,
+        error: error.message || "The magic link could not be sent. Please try again.",
+        success: "",
+        isSubmitting: false,
       }));
       return;
     }
@@ -767,8 +993,23 @@ function App() {
     setLoginForm((currentForm) => ({
       ...currentForm,
       error: "",
+      success: `Magic link sent to ${trimmedEmail}. Open the email and follow the link to finish signing in.`,
+      isSubmitting: false,
     }));
-    setIsAuthenticated(true);
+  };
+
+  const handleSignOut = async () => {
+    if (!supabase) return;
+
+    await supabase.auth.signOut();
+    setApprovedAdmin(null);
+    setIsAuthenticated(false);
+    setLoginForm({
+      email: "",
+      error: "",
+      success: "",
+      isSubmitting: false,
+    });
   };
 
   const resetNewMemberForm = () => {
@@ -1403,6 +1644,19 @@ function App() {
         <a className="brand" href="/" aria-label="CSA Family Tree CMS home">
           <span>CSA Family Tree Content Management System</span>
         </a>
+        {isAuthenticated && approvedAdmin ? (
+          <div className="header-actions">
+            <div className="header-auth-copy">
+              <strong>{approvedAdmin.email}</strong>
+              <span>
+                {approvedAdmin.adminRole === "super_admin" ? "Super admin" : "Admin"}
+              </span>
+            </div>
+            <button className="choose-button header-signout" type="button" onClick={() => void handleSignOut()}>
+              Sign out
+            </button>
+          </div>
+        ) : null}
       </header>
 
       {!isAuthenticated ? (
@@ -1413,12 +1667,11 @@ function App() {
               Access the family tree CMS
             </h1>
             <p className="auth-copy">
-              Sign in to manage member records and bulk uploads. Authentication is
-              still a placeholder for now, but the final version will only allow a
-              specific approved set of users.
+              Enter your email and we’ll send you a magic link. After you sign in,
+              the CMS will check whether your email has been approved in the admin users list.
             </p>
 
-            <form className="auth-form" onSubmit={handleLoginSubmit}>
+            <form className="auth-form" onSubmit={(event) => void handleLoginSubmit(event)}>
               <label className="field-group">
                 <span>Email</span>
                 <input
@@ -1436,31 +1689,28 @@ function App() {
                 />
               </label>
 
-              <label className="field-group">
-                <span>Password</span>
-                <input
-                  className="cell-input"
-                  type="password"
-                  autoComplete="current-password"
-                  value={loginForm.password}
-                  onChange={(event) =>
-                    setLoginForm((currentForm) => ({
-                      ...currentForm,
-                      password: event.target.value,
-                      error: "",
-                    }))
-                  }
-                />
-              </label>
-
               {loginForm.error && (
                 <p className="error-message inline-error" role="alert">
                   {loginForm.error}
                 </p>
               )}
 
-              <button className="continue-button auth-submit" type="submit">
-                Sign in
+              {loginForm.success && (
+                <p className="success-message" role="status">
+                  {loginForm.success}
+                </p>
+              )}
+
+              <button
+                className="continue-button auth-submit"
+                type="submit"
+                disabled={loginForm.isSubmitting || isAuthLoading}
+              >
+                {isAuthLoading
+                  ? "Checking access..."
+                  : loginForm.isSubmitting
+                    ? "Sending magic link..."
+                    : "Send magic link"}
               </button>
             </form>
           </section>
