@@ -366,6 +366,41 @@ h1 {
   gap: 0.45rem;
 }
 
+.autocomplete-field {
+  position: relative;
+}
+
+.autocomplete-menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 13rem;
+  overflow-y: auto;
+  padding: 0.35rem;
+  border: 1px solid #d6ddd1;
+  border-radius: 0.75rem;
+  background: #fffdf9;
+  box-shadow: 0 1rem 2.5rem rgba(30, 44, 34, 0.14);
+}
+
+.autocomplete-option {
+  width: 100%;
+  display: block;
+  padding: 0.62rem 0.7rem;
+  border: 0;
+  border-radius: 0.55rem;
+  color: #334136;
+  background: transparent;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.autocomplete-option:hover {
+  background: #f2f6ef;
+}
+
 .field-action {
   justify-content: flex-end;
   align-items: flex-end;

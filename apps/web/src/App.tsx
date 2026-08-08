@@ -149,6 +149,8 @@ type MemberDraft = {
   isDynastyHead: "true" | "false";
 };
 
+type BigSuggestionTarget = "add" | "edit" | null;
+
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} bytes`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -404,6 +406,8 @@ function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [isReading, setIsReading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [activeBigSuggestionTarget, setActiveBigSuggestionTarget] =
+    useState<BigSuggestionTarget>(null);
 
   useEffect(() => {
     void loadMembers();
@@ -573,6 +577,26 @@ function App() {
 
   const invalidPairings = pairings.filter((pairing) => pairing.errors.length > 0);
   const normalizedMemberSearchQuery = memberSearchQuery.trim().toLocaleLowerCase();
+  const memberNameSuggestions = [...new Set(members.map((member) => member.memberName))]
+    .sort((left, right) => left.localeCompare(right));
+  const activeBigSuggestionValue =
+    activeBigSuggestionTarget === "add"
+      ? newMemberForm.memberBig
+      : activeBigSuggestionTarget === "edit" && editDialog
+        ? editDialog.memberBig
+        : "";
+  const filteredBigSuggestions =
+    activeBigSuggestionTarget === null
+      ? []
+      : memberNameSuggestions.filter((memberName) => {
+          const normalizedSuggestion = memberName.toLocaleLowerCase();
+          const normalizedValue = activeBigSuggestionValue.trim().toLocaleLowerCase();
+
+          if (!normalizedSuggestion) return false;
+          if (!normalizedValue) return true;
+
+          return normalizedSuggestion.includes(normalizedValue);
+        });
   const filteredMembers = members.filter((member) =>
     !normalizedMemberSearchQuery
       ? true
@@ -686,6 +710,16 @@ function App() {
       error: "",
     }));
     setMembersError("");
+  };
+
+  const selectBigSuggestion = (target: Exclude<BigSuggestionTarget, null>, value: string) => {
+    if (target === "add") {
+      updateNewMemberField("memberBig", value);
+    } else {
+      updateMemberField("memberBig", value);
+    }
+
+    setActiveBigSuggestionTarget(null);
   };
 
   const resetNewMemberForm = () => {
@@ -1376,15 +1410,41 @@ function App() {
 
                 <label className="field-group">
                   <span>Big</span>
-                  <input
-                    className="cell-input"
-                    type="text"
-                    placeholder="None"
-                    value={newMemberForm.memberBig}
-                    onChange={(event) =>
-                      updateNewMemberField("memberBig", event.target.value)
-                    }
-                  />
+                  <div className="autocomplete-field">
+                    <input
+                      className="cell-input"
+                      type="text"
+                      placeholder="None"
+                      value={newMemberForm.memberBig}
+                      onChange={(event) =>
+                        updateNewMemberField("memberBig", event.target.value)
+                      }
+                      onFocus={() => setActiveBigSuggestionTarget("add")}
+                      onBlur={() => {
+                        window.setTimeout(() => {
+                          setActiveBigSuggestionTarget((currentTarget) =>
+                            currentTarget === "add" ? null : currentTarget,
+                          );
+                        }, 120);
+                      }}
+                    />
+                    {activeBigSuggestionTarget === "add" &&
+                      filteredBigSuggestions.length > 0 && (
+                        <div className="autocomplete-menu" role="listbox">
+                          {filteredBigSuggestions.map((memberName) => (
+                            <button
+                              key={memberName}
+                              className="autocomplete-option"
+                              type="button"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => selectBigSuggestion("add", memberName)}
+                            >
+                              {memberName}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                  </div>
                 </label>
 
                 <label className="field-group">
@@ -1880,15 +1940,41 @@ function App() {
 
               <label className="field-group">
                 <span>Big</span>
-                <input
-                  className="cell-input"
-                  type="text"
-                  placeholder="None"
-                  value={editDialog.memberBig}
-                  onChange={(event) =>
-                    updateMemberField("memberBig", event.target.value)
-                  }
-                />
+                <div className="autocomplete-field">
+                  <input
+                    className="cell-input"
+                    type="text"
+                    placeholder="None"
+                    value={editDialog.memberBig}
+                    onChange={(event) =>
+                      updateMemberField("memberBig", event.target.value)
+                    }
+                    onFocus={() => setActiveBigSuggestionTarget("edit")}
+                    onBlur={() => {
+                      window.setTimeout(() => {
+                        setActiveBigSuggestionTarget((currentTarget) =>
+                          currentTarget === "edit" ? null : currentTarget,
+                        );
+                      }, 120);
+                    }}
+                  />
+                  {activeBigSuggestionTarget === "edit" &&
+                    filteredBigSuggestions.length > 0 && (
+                      <div className="autocomplete-menu" role="listbox">
+                        {filteredBigSuggestions.map((memberName) => (
+                          <button
+                            key={memberName}
+                            className="autocomplete-option"
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => selectBigSuggestion("edit", memberName)}
+                          >
+                            {memberName}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                </div>
               </label>
 
               <label className="field-group">
