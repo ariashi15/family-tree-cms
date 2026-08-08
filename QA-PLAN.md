@@ -254,9 +254,9 @@ Use an edit case that fails after confirm, such as a duplicate name attempt.
 
 Verify:
 
-- [ ] the error returns inside the edit popup
-- [ ] the error does not appear below the editing rules callout
-- [ ] the user remains in the popup flow and can fix the issue
+- [x] the error returns inside the edit popup
+- [x] the error does not appear below the editing rules callout
+- [x] the user remains in the popup flow and can fix the issue
 
 ## 15. Delete Member: No Dependents
 
@@ -264,14 +264,14 @@ Delete someone with no mentees.
 
 Verify:
 
-- [ ] delete confirmation popup appears
-- [ ] popup names the correct member
-- [ ] after confirming, the row is removed
-- [ ] page refreshes automatically
+- [x] delete confirmation popup appears
+- [x] popup names the correct member
+- [x] after confirming, the row is removed
+- [x] page refreshes automatically
 
 Also test:
 
-- [ ] canceling delete makes no change
+- [x] canceling delete makes no change
 
 ## 16. Delete Member: With Dependents
 
@@ -279,10 +279,10 @@ Delete a mentor with dependents.
 
 Verify:
 
-- [ ] confirmation explains that dependent rows will have Member Big set to null
-- [ ] after confirming, the mentor row is gone
-- [ ] affected dependent rows now have Member Big = null
-- [ ] page refreshes automatically
+- [x] confirmation explains that dependent rows will have Member Big set to null
+- [x] after confirming, the mentor row is gone
+- [x] affected dependent rows now have Member Big = null
+- [x] page refreshes automatically
 
 ## 17. Bulk Upload Regression Check
 
