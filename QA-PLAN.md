@@ -229,24 +229,24 @@ Change:
 
 Verify:
 
-- [ ] review popup shows the Big change
-- [ ] popup says Henry Cole does not exist and a new row will be created
-- [ ] popup does not say Ben’s branch will inherit Henry Cole’s dynasty
-- [ ] popup shows a full bullet list for the new Henry Cole row
-- [ ] new Henry Cole row shows:
-  - [ ] Member Name = Henry Cole
-  - [ ] Big = null
-  - [ ] Dynasty = Ben’s current dynasty
-  - [ ] Dynasty Head = No
-- [ ] after confirming, Henry Cole exists
-- [ ] Henry Cole inherits Ben’s dynasty
-- [ ] Ben keeps the expected dynasty
-- [ ] branch dynasty inheritance does not incorrectly pretend Henry’s dynasty already existed
-- [ ] page refreshes automatically
+- [x] review popup shows the Big change
+- [x] popup says Henry Cole does not exist and a new row will be created
+- [x] popup does not say Ben’s branch will inherit Henry Cole’s dynasty
+- [x] popup shows a full bullet list for the new Henry Cole row
+- [x] new Henry Cole row shows:
+  - [x] Member Name = Henry Cole
+  - [x] Big = null
+  - [x] Dynasty = Ben’s current dynasty
+  - [x] Dynasty Head = No
+- [x] after confirming, Henry Cole exists
+- [x] Henry Cole inherits Ben’s dynasty
+- [x] Ben keeps the expected dynasty
+- [x] branch dynasty inheritance does not incorrectly pretend Henry’s dynasty already existed
+- [x] page refreshes automatically
 
 Also test:
 
-- [ ] canceling this popup makes no changes
+- [x] canceling this popup makes no changes
 
 ## 14. Edit Error Placement After Confirm
 
