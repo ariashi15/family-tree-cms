@@ -865,6 +865,17 @@ function App() {
     }
   }
 
+  function findMemberByName(value: string) {
+    const normalizedName = value.trim().toLocaleLowerCase();
+
+    if (!normalizedName) return undefined;
+
+    return members.find(
+      (member) =>
+        member.memberName.trim().toLocaleLowerCase() === normalizedName,
+    );
+  }
+
   const selectFile = async (file?: File) => {
     setUploadError("");
     setUploadSuccessMessage("");
@@ -1017,6 +1028,7 @@ function App() {
           .toLocaleLowerCase()
           .includes(normalizedMemberSearchQuery),
   );
+  const existingNewMemberBig = findMemberByName(newMemberForm.memberBig);
   const canUpload =
     pairings.length > 0 &&
     invalidPairings.length === 0 &&
@@ -1117,6 +1129,12 @@ function App() {
     setNewMemberForm((currentForm) => ({
       ...currentForm,
       [field]: value,
+      ...(field === "memberBig"
+        ? {
+            dynasty:
+              findMemberByName(value)?.dynasty ?? currentForm.dynasty,
+          }
+        : {}),
       error: "",
     }));
     setMembersError("");
@@ -1233,15 +1251,22 @@ function App() {
   const buildCreateSummary = () => {
     const trimmedMemberName = newMemberForm.memberName.trim();
     const trimmedMemberBig = newMemberForm.memberBig.trim();
+    const existingbig = findMemberByName(trimmedMemberBig);
+    const effectiveDynasty = existingbig?.dynasty ?? newMemberForm.dynasty;
 
     return {
       summaryLines: [
         `Member Name: ${trimmedMemberName}`,
         `Big: ${trimmedMemberBig || "null"}`,
-        `Dynasty: ${formatDynasty(newMemberForm.dynasty)}`,
+        `Dynasty: ${formatDynasty(effectiveDynasty)}`,
         `Dynasty Head: ${formatBool(newMemberForm.isDynastyHead)}`,
       ],
-      effectLines: [] as string[],
+      effectLines:
+        existingbig && newMemberForm.dynasty !== existingbig.dynasty
+          ? [
+              `${trimmedMemberName} will inherit ${existingbig.memberName}'s dynasty of ${formatDynasty(existingbig.dynasty)}.`,
+            ]
+          : ([] as string[]),
     };
   };
 
@@ -1468,6 +1493,8 @@ function App() {
   const createMember = async (createMissingbig: boolean) => {
     const trimmedMemberName = newMemberForm.memberName.trim();
     const trimmedMemberBig = newMemberForm.memberBig.trim();
+    const effectiveDynasty =
+      findMemberByName(trimmedMemberBig)?.dynasty ?? newMemberForm.dynasty;
 
     setNewMemberForm((currentForm) => ({
       ...currentForm,
@@ -1485,7 +1512,7 @@ function App() {
         body: JSON.stringify({
           member_name: trimmedMemberName,
           member_big: trimmedMemberBig || null,
-          dynasty: newMemberForm.dynasty,
+          dynasty: effectiveDynasty,
           is_dynasty_head: newMemberForm.isDynastyHead === "true",
           create_missing_big: createMissingbig,
         }),
@@ -2056,10 +2083,13 @@ function App() {
                 </label>
 
                 <label className="field-group">
-                  <span>Dynasty</span>
+                  <span>
+                    Dynasty{existingNewMemberBig ? " (inherited from big)" : ""}
+                  </span>
                   <select
                     className={getDynastySelectClass(newMemberForm.dynasty)}
                     value={newMemberForm.dynasty}
+                    disabled={Boolean(existingNewMemberBig)}
                     onChange={(event) =>
                       updateNewMemberField("dynasty", event.target.value)
                     }

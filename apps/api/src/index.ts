@@ -62,6 +62,7 @@ type MemberInsert = {
   member_name: string;
   member_big: string | null;
   dynasty: string;
+  is_dynasty_head: boolean;
 };
 
 type MemberUpdateRequest = {
@@ -398,18 +399,34 @@ app.post("/api/members", async (request, response) => {
     namesToCheck.add(creation.member_big);
   }
 
-  const { data: existingMembers, error: existingMembersError } = await supabase
-    .from(membersTable)
-    .select("id, member_name")
-    .in("member_name", [...namesToCheck]);
+  const existingMemberLookups = await Promise.all(
+    [...namesToCheck].map((memberName) =>
+      supabase
+        .from(membersTable)
+        .select("id, member_name, dynasty")
+        .ilike("member_name", memberName),
+    ),
+  );
+  const existingMembersError = existingMemberLookups.find(
+    (lookup) => lookup.error,
+  )?.error;
 
   if (existingMembersError) {
     response.status(500).json({ error: existingMembersError.message });
     return;
   }
 
+  const normalizedNamesToCheck = new Set(
+    [...namesToCheck].map((memberName) => memberName.toLocaleLowerCase()),
+  );
+  const existingMembers = existingMemberLookups
+    .flatMap((lookup) => lookup.data ?? [])
+    .filter((member) =>
+      normalizedNamesToCheck.has(member.member_name.toLocaleLowerCase()),
+    );
+
   const existingByLowerName = new Map(
-    (existingMembers ?? []).map((member) => [
+    existingMembers.map((member) => [
       member.member_name.toLocaleLowerCase(),
       member,
     ]),
@@ -424,9 +441,11 @@ app.post("/api/members", async (request, response) => {
 
   const bigName = creation.member_big;
   const normalizedbigName = bigName?.toLocaleLowerCase();
-  const bigExists = normalizedbigName
-    ? existingByLowerName.has(normalizedbigName)
-    : true;
+  const existingbig = normalizedbigName
+    ? existingByLowerName.get(normalizedbigName)
+    : undefined;
+  const bigExists = normalizedbigName ? Boolean(existingbig) : true;
+  const effectiveDynasty = existingbig?.dynasty ?? creation.dynasty;
 
   if (bigName && !bigExists && !creation.create_missing_big) {
     response.status(409).json({
@@ -444,13 +463,15 @@ app.post("/api/members", async (request, response) => {
       member_name: bigName,
       member_big: null,
       dynasty: creation.dynasty,
+      is_dynasty_head: false,
     });
   }
 
   inserts.push({
     member_name: creation.member_name,
     member_big: creation.member_big,
-    dynasty: creation.dynasty,
+    dynasty: effectiveDynasty,
+    is_dynasty_head: creation.is_dynasty_head,
   });
 
   const { data, error } = await supabase
@@ -892,6 +913,7 @@ app.post("/api/pairings/import", async (request, response) => {
         member_name: pairing.big_name,
         member_big: null,
         dynasty: pairing.dynasty,
+        is_dynasty_head: false,
       });
       rowInserted = true;
     }
@@ -904,6 +926,7 @@ app.post("/api/pairings/import", async (request, response) => {
         member_name: pairing.little_name,
         member_big: pairing.big_name,
         dynasty: pairing.dynasty,
+        is_dynasty_head: false,
       });
       rowInserted = true;
     }
