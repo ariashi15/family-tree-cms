@@ -1,5 +1,8 @@
 import cors from "cors";
 import "dotenv/config";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express, {
   type NextFunction,
   type Request,
@@ -79,8 +82,9 @@ type MemberCreateRequest = MemberUpdateRequest & {
 
 const allowedDynasties = new Set(["fire", "water", "earth", "wind"]);
 
-const app = express();
+export const app = express();
 const port = Number(process.env.PORT ?? 3000);
+const isProduction = process.env.NODE_ENV === "production";
 const allowedOrigins = process.env.CORS_ORIGIN
   ?.split(",")
   .map((origin) => origin.trim())
@@ -90,9 +94,30 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SECRET_KEY;
 const membersTable = process.env.SUPABASE_MEMBERS_TABLE ?? "members";
 const adminUsersTable = process.env.SUPABASE_ADMIN_USERS_TABLE ?? "admin_users";
 
+if (
+  isProduction &&
+  (!allowedOrigins?.length || allowedOrigins.some((origin) => !isExactHttpsOrigin(origin)))
+) {
+  throw new Error(
+    "CORS_ORIGIN must contain one or more exact HTTPS origins in production (for example, https://cms.example.com).",
+  );
+}
+
 app.use(
   cors({
-    origin: allowedOrigins?.length ? allowedOrigins : true,
+    origin(requestOrigin, callback) {
+      if (!requestOrigin) {
+        callback(null, true);
+        return;
+      }
+
+      if (!allowedOrigins?.length) {
+        callback(null, !isProduction);
+        return;
+      }
+
+      callback(null, allowedOrigins.includes(requestOrigin));
+    },
   }),
 );
 app.use(express.json());
@@ -574,9 +599,18 @@ app.patch("/api/members/:id", async (request, response) => {
   let existingbig: Pick<MemberRow, "id" | "member_name" | "dynasty"> | null = null;
   const { create_missing_big: createMissingbig, ...memberUpdates } =
     updates;
+  const normalizedCurrentBig =
+    currentMember.member_big?.trim().toLocaleLowerCase() ?? "";
+  const normalizedUpdatedBig =
+    updates.member_big?.trim().toLocaleLowerCase() ?? "";
+  const bigChanged = normalizedCurrentBig !== normalizedUpdatedBig;
 
   if (updates.member_big) {
-    if (updates.member_big.toLocaleLowerCase() === normalizedMemberName) {
+    if (isSelfBigReference(
+      currentMember.member_name,
+      updates.member_name,
+      updates.member_big,
+    )) {
       response.status(400).json({
         error: "A member cannot list themself as their own big.",
       });
@@ -626,6 +660,7 @@ app.patch("/api/members/:id", async (request, response) => {
     const wouldCreateCycle = createsBigCycle(
       (familyRows ?? []) as Pick<MemberRow, "id" | "member_name" | "member_big">[],
       memberId,
+      currentMember.member_name,
       updates.member_name,
       updates.member_big,
     );
@@ -654,6 +689,7 @@ app.patch("/api/members/:id", async (request, response) => {
           member_name: updates.member_big,
           member_big: null,
           dynasty: updates.dynasty,
+          is_dynasty_head: false,
         })
         .select("id, created_at, member_name, member_big, dynasty, is_dynasty_head");
 
@@ -665,6 +701,14 @@ app.patch("/api/members/:id", async (request, response) => {
       createdbig = ((createdbigRows ?? [])[0] ?? null) as MemberRow | null;
     }
   }
+
+  const inheritsExistingBigDynasty = bigChanged && existingbig !== null;
+
+  memberUpdates.dynasty = resolveUpdatedDynasty(
+    updates.dynasty,
+    bigChanged,
+    existingbig?.dynasty,
+  );
 
   const { data, error } = await supabase
     .from(membersTable)
@@ -690,7 +734,10 @@ app.patch("/api/members/:id", async (request, response) => {
     }
   }
 
-  if (currentMember.dynasty !== updates.dynasty) {
+  if (
+    !inheritsExistingBigDynasty &&
+    currentMember.dynasty !== memberUpdates.dynasty
+  ) {
     const { data: familyRows, error: familyRowsError } = await supabase
       .from(membersTable)
       .select("id, member_name, member_big");
@@ -723,7 +770,7 @@ app.patch("/api/members/:id", async (request, response) => {
     for (const relatedMember of relatedMembers) {
       const { error: relativeDynastyError } = await supabase
         .from(membersTable)
-        .update({ dynasty: updates.dynasty })
+        .update({ dynasty: memberUpdates.dynasty })
         .eq("id", relatedMember.id);
 
       if (relativeDynastyError) {
@@ -733,7 +780,7 @@ app.patch("/api/members/:id", async (request, response) => {
     }
   }
 
-  if (currentMember.member_big !== updates.member_big && updates.member_big) {
+  if (bigChanged && updates.member_big) {
     if (existingbig) {
       const { data: familyRows, error: familyRowsError } = await supabase
         .from(membersTable)
@@ -769,8 +816,19 @@ app.patch("/api/members/:id", async (request, response) => {
     }
   }
 
+  const { data: finalMember, error: finalMemberError } = await supabase
+    .from(membersTable)
+    .select("id, created_at, member_name, member_big, dynasty, is_dynasty_head")
+    .eq("id", memberId)
+    .single();
+
+  if (finalMemberError) {
+    response.status(500).json({ error: finalMemberError.message });
+    return;
+  }
+
   response.json({
-    member: data as MemberRow,
+    member: (finalMember ?? data) as MemberRow,
     createdbig,
   });
 });
@@ -968,9 +1026,33 @@ app.post("/api/pairings/import", async (request, response) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`API listening on http://localhost:${port}`);
-});
+const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
+const webDistDirectory = path.resolve(currentDirectory, "../../web/dist");
+const webIndexPath = path.join(webDistDirectory, "index.html");
+
+if (isProduction) {
+  if (!existsSync(webIndexPath)) {
+    throw new Error(
+      "The frontend production build is missing. Run `pnpm build` before `pnpm start`.",
+    );
+  }
+
+  app.use(express.static(webDistDirectory));
+  app.use((request, response, next) => {
+    if (request.method !== "GET" || request.path.startsWith("/api/")) {
+      next();
+      return;
+    }
+
+    response.sendFile(webIndexPath);
+  });
+}
+
+if (process.env.NODE_ENV !== "test") {
+  app.listen(port, () => {
+    console.log(`CMS listening on http://localhost:${port}`);
+  });
+}
 
 async function requireAuthenticatedUser(
   request: Request,
@@ -1099,6 +1181,16 @@ function normalizeEmail(value: unknown) {
   return typeof value === "string"
     ? value.trim().toLocaleLowerCase()
     : "";
+}
+
+function isExactHttpsOrigin(value: string) {
+  try {
+    const parsed = new URL(value);
+
+    return parsed.protocol === "https:" && parsed.origin === value;
+  } catch {
+    return false;
+  }
 }
 
 function isApprovedAdminRow(value: unknown): value is AdminUserRow {
@@ -1305,9 +1397,33 @@ function getDescendantFamilyMembers(
   return nodes.filter((member) => visited.has(member.id));
 }
 
-function createsBigCycle(
+export function isSelfBigReference(
+  currentMemberName: string,
+  updatedMemberName: string,
+  proposedBigName: string,
+) {
+  const normalizedProposedBig = proposedBigName.trim().toLocaleLowerCase();
+
+  return (
+    normalizedProposedBig === currentMemberName.trim().toLocaleLowerCase() ||
+    normalizedProposedBig === updatedMemberName.trim().toLocaleLowerCase()
+  );
+}
+
+export function resolveUpdatedDynasty(
+  requestedDynasty: string,
+  bigChanged: boolean,
+  existingBigDynasty?: string,
+) {
+  return bigChanged && existingBigDynasty
+    ? existingBigDynasty
+    : requestedDynasty;
+}
+
+export function createsBigCycle(
   members: Pick<MemberRow, "id" | "member_name" | "member_big">[],
   rootMemberId: string,
+  currentMemberName: string,
   updatedMemberName: string,
   proposedBigName: string,
 ) {
@@ -1315,8 +1431,21 @@ function createsBigCycle(
 
   if (!normalizedProposedBigName) return false;
 
+  const normalizedCurrentMemberName = currentMemberName
+    .trim()
+    .toLocaleLowerCase();
+  const normalizedUpdatedMemberName = updatedMemberName
+    .trim()
+    .toLocaleLowerCase();
+  const graphMembers = members.map((member) =>
+    String(member.id) !== String(rootMemberId) &&
+    normalizedCurrentMemberName !== normalizedUpdatedMemberName &&
+    member.member_big?.trim().toLocaleLowerCase() === normalizedCurrentMemberName
+      ? { ...member, member_big: updatedMemberName }
+      : member,
+  );
   const descendantMembers = getDescendantFamilyMembers(
-    members,
+    graphMembers,
     rootMemberId,
     updatedMemberName,
   );

@@ -5,10 +5,15 @@
   "scripts": {
     "dev": "pnpm --parallel --filter @family-tree-cms/web --filter @family-tree-cms/api dev",
     "build": "pnpm --recursive build",
-    "start": "pnpm --parallel --filter @family-tree-cms/web --filter @family-tree-cms/api start"
+    "test": "pnpm --recursive --if-present test",
+    "start": "pnpm --filter @family-tree-cms/api start"
   },
   "devDependencies": {
     "typescript": "^5.8.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "nanoid@<3.3.18": "3.3.18"
+    }
   }
 }
-

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "start": "vite preview"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.111.0",

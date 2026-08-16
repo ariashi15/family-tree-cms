@@ -197,35 +197,34 @@ The update flow applies the following rules:
 
 ### Simultaneous changes and precedence
 
-An update may change several fields at once. The backend currently performs
-the database work in this order:
+An update may change several fields at once. Relationship inheritance takes
+precedence over a conflicting submitted dynasty:
 
 1. Create a confirmed missing big, if necessary.
-2. Update the target row with all submitted fields.
-3. Cascade a changed member name into direct littles' `member_big` fields.
-4. If the submitted dynasty differs from the member's original dynasty, apply
-   it to the connected family component built from the new relationship graph.
-5. If `member_big` changed to an existing member, apply the existing big's
-   original dynasty to the edited member and all descendants.
+2. If the big changed to an existing member, replace the edited member's
+   submitted dynasty with that big's dynasty.
+3. Update the target row with the resulting fields.
+4. Cascade a changed member name into direct littles' `member_big` fields.
+5. If the big changed to an existing member, apply that big's dynasty to the
+   edited member and all descendants. The big, their ancestors, and their
+   other branches are left unchanged.
+6. Otherwise, if the requested dynasty differs from the original dynasty,
+   apply it to the entire connected family component.
 
-The last applicable rule wins. Therefore, when an update simultaneously
-submits a new dynasty and changes to an existing big with a different dynasty,
-the edited member and descendants finish with the existing big's original
-dynasty. The earlier family-wide dynasty cascade may already have changed the
-new big and their other relatives to the explicitly submitted dynasty. This can
-leave one connected tree with mixed dynasties and is a known conflict that is
-not yet resolved atomically.
+Therefore, changing both fields cannot recolor the existing big's family with
+the conflicting submitted value. The frontend also selects and locks the
+inherited dynasty as soon as an existing big is chosen, while the API enforces
+the same precedence for direct callers.
 
 Changing a big to a newly created member has no competing existing dynasty, so
 the new big and edited branch use the submitted dynasty.
 
 ### Edge cases and current limitations
 
-- **Rename plus old name as big:** If a member is renamed while their new
-  `member_big` is set to their own old name, the normal self-reference and cycle
-  checks do not currently recognize the alias. The rename cascade can then turn
-  that value into a direct self-reference. This combination should not be used
-  until the backend explicitly blocks it.
+- **Rename plus relationship change:** The old and new member names are treated
+  as aliases during validation. Setting the big to the member's old name is
+  rejected as a self-reference, and descendant-cycle detection models the
+  pending rename before allowing the update.
 - **No transaction across cascades:** Missing-big creation, the main row
   update, rename cascades, and dynasty cascades are separate database
   operations. If a later operation fails, earlier operations are not rolled
@@ -276,13 +275,80 @@ Build every workspace package:
 pnpm build
 ```
 
-After building, start the API and serve the frontend build concurrently:
+After building, start the production server:
 
 ```sh
 pnpm start
 ```
 
-The frontend preview server uses `http://localhost:4173` by default.
+The Express process serves both the API and the compiled frontend from one
+origin. `vite preview` is available as `pnpm --filter @family-tree-cms/web
+preview` for local build inspection only; it is not the production server.
+
+### Production environment and hosting
+
+Deploy the repository to a Node.js host that runs these commands:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm build
+pnpm start
+```
+
+Set these server-side environment variables in the host's secret manager:
+
+```sh
+NODE_ENV=production
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_SECRET_KEY=your-secret-key
+SUPABASE_MEMBERS_TABLE=members
+SUPABASE_ADMIN_USERS_TABLE=admin_users
+CORS_ORIGIN=https://cms.example.com
+```
+
+`CORS_ORIGIN` is fail-closed in production and accepts only exact HTTPS
+origins. Use a comma-separated list only if another browser client must call
+the API directly, for example
+`https://cms.example.com,https://client.example.com`. Do not use `*`, paths,
+or trailing slashes. Requests without an `Origin` header, such as server-side
+requests, remain supported.
+
+The host must terminate HTTPS and redirect HTTP traffic to HTTPS. Replace
+`https://cms.example.com` with the final deployed domain. In Supabase, open
+**Authentication → URL Configuration** and set:
+
+- **Site URL:** `https://cms.example.com`
+- **Redirect URLs:** add the exact value `https://cms.example.com`
+
+The magic-link code redirects to `window.location.origin`, so the configured
+Supabase value and deployed origin must match exactly.
+
+The frontend build needs the browser-safe values below. They are compiled into
+the JavaScript bundle and must not contain the Supabase secret key:
+
+```sh
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-publishable-key
+```
+
+`VITE_API_URL` is optional in production because the compiled frontend calls
+the same origin by default. Set it only when intentionally deploying the API at
+a different exact HTTPS origin. Never expose `SUPABASE_SECRET_KEY` as a `VITE_`
+variable or commit real `.env` files.
+
+### Verification
+
+Run the local checks before deployment:
+
+```sh
+pnpm test
+pnpm build
+pnpm audit --prod
+```
+
+After deployment, verify `/api/health`, request a magic link using the final
+domain, confirm that an approved admin can enter the CMS, and confirm that an
+unapproved Supabase user is denied access.
 
 Individual applications can also be run with pnpm filters, for example:
 

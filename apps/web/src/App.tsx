@@ -5,10 +5,10 @@ import { isSupabaseConfigured, supabase } from "./lib/supabase";
 
 const expectedColumns = ["big_name", "little_name", "dynasty"];
 const allowedDynasties = ["fire", "water", "earth", "wind"] as const;
-const apiUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3000").replace(
-  /\/$/,
-  "",
-);
+const apiUrl = (
+  import.meta.env.VITE_API_URL ??
+  (import.meta.env.DEV ? "http://localhost:3000" : window.location.origin)
+).replace(/\/$/, "");
 
 async function authenticatedApiFetch(url: string, init?: RequestInit) {
   if (!supabase) {
@@ -377,13 +377,29 @@ function getDescendantRelativeNames(
   members: EditableMember[],
   rootMemberId: string,
   updatedMemberName: string,
+  currentMemberName = updatedMemberName,
 ) {
   const normalizedRootMemberId = rootMemberId;
-  const nodes = members.map((member) =>
-    member.id === normalizedRootMemberId
-      ? { ...member, memberName: updatedMemberName }
-      : member,
-  );
+  const normalizedCurrentMemberName = currentMemberName
+    .trim()
+    .toLocaleLowerCase();
+  const normalizedUpdatedMemberName = updatedMemberName
+    .trim()
+    .toLocaleLowerCase();
+  const nodes = members.map((member) => {
+    if (member.id === normalizedRootMemberId) {
+      return { ...member, memberName: updatedMemberName };
+    }
+
+    if (
+      normalizedCurrentMemberName !== normalizedUpdatedMemberName &&
+      member.memberBig.trim().toLocaleLowerCase() === normalizedCurrentMemberName
+    ) {
+      return { ...member, memberBig: updatedMemberName };
+    }
+
+    return member;
+  });
   const byName = new Map(
     nodes.map((member) => [member.memberName.trim().toLocaleLowerCase(), member.id]),
   );
@@ -431,6 +447,7 @@ function getDescendantRelativeNames(
 function wouldCreateBigCycle(
   members: EditableMember[],
   rootMemberId: string,
+  currentMemberName: string,
   updatedMemberName: string,
   proposedBigName: string,
 ) {
@@ -442,6 +459,7 @@ function wouldCreateBigCycle(
     members,
     rootMemberId,
     updatedMemberName,
+    currentMemberName,
   ).map((name) => name.trim().toLocaleLowerCase());
 
   return descendantNames.includes(normalizedProposedBigName);
@@ -449,7 +467,6 @@ function wouldCreateBigCycle(
 
 function App() {
   const inputRef = useRef<HTMLInputElement>(null);
-  const isLocalAuthBypassEnabled = import.meta.env.DEV;
   const [activeTab, setActiveTab] = useState<Tab>("members");
 
   const [members, setMembers] = useState<EditableMember[]>([]);
@@ -1029,6 +1046,24 @@ function App() {
           .includes(normalizedMemberSearchQuery),
   );
   const existingNewMemberBig = findMemberByName(newMemberForm.memberBig);
+  const originalEditMember = editDialog
+    ? memberSnapshots[editDialog.memberId]
+    : undefined;
+  const existingEditMemberBig = editDialog
+    ? members.find(
+        (member) =>
+          member.id !== editDialog.memberId &&
+          member.memberName.trim().toLocaleLowerCase() ===
+            editDialog.memberBig.trim().toLocaleLowerCase(),
+      )
+    : undefined;
+  const isReparentingToExistingBig = Boolean(
+    editDialog &&
+      originalEditMember &&
+      existingEditMemberBig &&
+      editDialog.memberBig.trim().toLocaleLowerCase() !==
+        originalEditMember.memberBig.trim().toLocaleLowerCase(),
+  );
   const canUpload =
     pairings.length > 0 &&
     invalidPairings.length === 0 &&
@@ -1114,11 +1149,35 @@ function App() {
     field: "memberName" | "memberBig" | "dynasty" | "isDynastyHead",
     value: string,
   ) => {
-    setEditDialog((currentDialog) =>
-      currentDialog
-        ? { ...currentDialog, [field]: value, rowError: "" }
-        : currentDialog,
-    );
+    setEditDialog((currentDialog) => {
+      if (!currentDialog) return currentDialog;
+
+      const nextDialog = {
+        ...currentDialog,
+        [field]: value,
+        rowError: "",
+      };
+
+      if (field === "memberBig") {
+        const original = memberSnapshots[currentDialog.memberId];
+        const selectedBig = members.find(
+          (member) =>
+            member.id !== currentDialog.memberId &&
+            member.memberName.trim().toLocaleLowerCase() ===
+              value.trim().toLocaleLowerCase(),
+        );
+        const isChanged =
+          original &&
+          value.trim().toLocaleLowerCase() !==
+            original.memberBig.trim().toLocaleLowerCase();
+
+        if (selectedBig && isChanged) {
+          nextDialog.dynasty = selectedBig.dynasty;
+        }
+      }
+
+      return nextDialog;
+    });
     setMembersError("");
   };
 
@@ -1222,21 +1281,6 @@ function App() {
     });
   };
 
-  const handleBypassAuth = () => {
-    setApprovedAdmin({
-      email: "local-test@dev",
-      adminRole: "super_admin",
-    });
-    setIsAuthenticated(true);
-    setIsAuthLoading(false);
-    setLoginForm({
-      email: "local-test@dev",
-      error: "",
-      success: "",
-      isSubmitting: false,
-    });
-  };
-
   const resetNewMemberForm = () => {
     setNewMemberForm({
       memberName: "",
@@ -1308,6 +1352,18 @@ function App() {
       label: string;
       summaryLines: string[];
     }[] = [];
+    const bigChanged =
+      current.memberBig.trim().toLocaleLowerCase() !==
+      original.memberBig.trim().toLocaleLowerCase();
+    const newBig = bigChanged
+      ? members.find(
+          (member) =>
+            member.id !== memberId &&
+            member.memberName.trim().toLocaleLowerCase() ===
+              current.memberBig.trim().toLocaleLowerCase(),
+        )
+      : undefined;
+    const effectiveDynasty = newBig?.dynasty ?? current.dynasty;
 
     if (current.memberName.trim() !== original.memberName.trim()) {
       summaryLines.push(
@@ -1315,22 +1371,17 @@ function App() {
       );
     }
 
-    if (current.memberBig.trim() !== original.memberBig.trim()) {
+    if (bigChanged) {
       summaryLines.push(
         `Big: ${original.memberBig || "null"} -> ${current.memberBig || "null"}`,
       );
 
       if (current.memberBig.trim()) {
-        const newBig = members.find(
-          (member) =>
-            member.id !== memberId &&
-            member.memberName.trim().toLocaleLowerCase() ===
-              current.memberBig.trim().toLocaleLowerCase(),
-        );
         const descendantNames = getDescendantRelativeNames(
           members,
           memberId,
           current.memberName.trim(),
+          original.memberName.trim(),
         );
 
         if (newBig) {
@@ -1342,7 +1393,7 @@ function App() {
                 : current.memberName
             }`,
             summaryLines: [
-              `Dynasty: ${formatDynasty(original.dynasty)} -> ${formatDynasty(newBig.dynasty)}`,
+              `Dynasty: ${formatDynasty(original.dynasty)} -> ${formatDynasty(effectiveDynasty)}`,
             ],
           });
         } else if (createMissingbig) {
@@ -1360,9 +1411,9 @@ function App() {
       }
     }
 
-    if (current.dynasty !== original.dynasty) {
+    if (effectiveDynasty !== original.dynasty) {
       summaryLines.push(
-        `Dynasty: ${formatDynasty(original.dynasty)} -> ${formatDynasty(current.dynasty)}`,
+        `Dynasty: ${formatDynasty(original.dynasty)} -> ${formatDynasty(effectiveDynasty)}`,
       );
     }
 
@@ -1390,8 +1441,8 @@ function App() {
       }
     }
 
-    if (current.dynasty !== original.dynasty) {
-      const dynastyChangeLine = `Dynasty: ${formatDynasty(original.dynasty)} -> ${formatDynasty(current.dynasty)}`;
+    if (!newBig && effectiveDynasty !== original.dynasty) {
+      const dynastyChangeLine = `Dynasty: ${formatDynasty(original.dynasty)} -> ${formatDynasty(effectiveDynasty)}`;
       const relativeNames = getConnectedFamilyRelativeNames(
         members,
         memberId,
@@ -1616,7 +1667,9 @@ function App() {
       rowError = "Dynasty must be fire, water, earth, or wind.";
     } else if (
       trimmedMemberBig &&
-      trimmedMemberBig.toLocaleLowerCase() === trimmedMemberName.toLocaleLowerCase()
+      (trimmedMemberBig.toLocaleLowerCase() === trimmedMemberName.toLocaleLowerCase() ||
+        trimmedMemberBig.toLocaleLowerCase() ===
+          memberSnapshots[memberId]?.memberName.trim().toLocaleLowerCase())
     ) {
       rowError = "A member cannot list themself as their own big.";
     } else if (
@@ -1624,6 +1677,7 @@ function App() {
       wouldCreateBigCycle(
         members,
         target.id,
+        memberSnapshots[memberId]?.memberName ?? trimmedMemberName,
         trimmedMemberName,
         trimmedMemberBig,
       )
@@ -1825,7 +1879,11 @@ function App() {
       rowError = "Dynasty must be fire, water, earth, or wind.";
     } else if (
       trimmedMemberBig &&
-      trimmedMemberBig.toLocaleLowerCase() === trimmedMemberName.toLocaleLowerCase()
+      (trimmedMemberBig.toLocaleLowerCase() === trimmedMemberName.toLocaleLowerCase() ||
+        trimmedMemberBig.toLocaleLowerCase() ===
+          memberSnapshots[editDialog.memberId]?.memberName
+            .trim()
+            .toLocaleLowerCase())
     ) {
       rowError = "A member cannot list themself as their own big.";
     } else if (
@@ -1833,6 +1891,7 @@ function App() {
       wouldCreateBigCycle(
         members,
         editDialog.memberId,
+        memberSnapshots[editDialog.memberId]?.memberName ?? trimmedMemberName,
         trimmedMemberName,
         trimmedMemberBig,
       )
@@ -1947,15 +2006,6 @@ function App() {
                     : "Send magic link"}
               </button>
 
-                {isLocalAuthBypassEnabled ? (
-                  <button
-                    className="choose-button auth-bypass"
-                    type="button"
-                    onClick={handleBypassAuth}
-                  >
-                    Bypass auth for local testing
-                  </button>
-                ) : null}
             </form>
           </section>
         </main>
@@ -2801,10 +2851,13 @@ function App() {
               </label>
 
               <label className="field-group">
-                <span>Dynasty</span>
+                <span>
+                  Dynasty{isReparentingToExistingBig ? " (inherited from big)" : ""}
+                </span>
                 <select
                   className={getDynastySelectClass(editDialog.dynasty)}
                   value={editDialog.dynasty}
+                  disabled={isReparentingToExistingBig}
                   onChange={(event) =>
                     updateMemberField("dynasty", event.target.value)
                   }
