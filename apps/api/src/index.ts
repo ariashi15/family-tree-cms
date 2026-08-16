@@ -1,7 +1,11 @@
 import cors from "cors";
 import "dotenv/config";
-import express from "express";
-import { createClient } from "@supabase/supabase-js";
+import express, {
+  type NextFunction,
+  type Request,
+  type Response,
+} from "express";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 type PairingImportRow = {
   big_name: string;
@@ -64,6 +68,7 @@ const allowedOrigins = process.env.CORS_ORIGIN
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SECRET_KEY;
 const membersTable = process.env.SUPABASE_MEMBERS_TABLE ?? "members";
+const adminUsersTable = process.env.SUPABASE_ADMIN_USERS_TABLE ?? "admin_users";
 
 app.use(
   cors({
@@ -79,7 +84,17 @@ app.get("/api/health", (_request, response) => {
   });
 });
 
-app.get("/api/members", async (_request, response) => {
+app.get("/api/public/members", listMembers);
+
+app.use("/api/members", requireApprovedAdmin);
+app.use("/api/pairings/import", requireApprovedAdmin);
+
+app.get("/api/members", listMembers);
+
+async function listMembers(
+  _request: Request,
+  response: Response,
+) {
   const supabase = getSupabaseClient();
 
   if (!supabase) {
@@ -103,7 +118,7 @@ app.get("/api/members", async (_request, response) => {
   response.json({
     members: (data ?? []) as MemberRow[],
   });
-});
+}
 
 app.post("/api/members", async (request, response) => {
   const supabase = getSupabaseClient();
@@ -691,12 +706,93 @@ app.listen(port, () => {
   console.log(`API listening on http://localhost:${port}`);
 });
 
-function getSupabaseClient() {
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
-    return null;
+async function requireApprovedAdmin(
+  request: Request,
+  response: Response,
+  next: NextFunction,
+) {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    response.status(500).json({
+      error:
+        "Supabase is not configured. Add SUPABASE_URL and SUPABASE_SECRET_KEY in apps/api/.env.",
+    });
+    return;
   }
 
-  return createClient(supabaseUrl, supabaseServiceRoleKey);
+  const authorizationHeader = request.header("authorization");
+  const authorizationParts = authorizationHeader?.trim().split(/\s+/) ?? [];
+
+  if (
+    authorizationParts.length !== 2 ||
+    authorizationParts[0].toLocaleLowerCase() !== "bearer" ||
+    !authorizationParts[1]
+  ) {
+    response.status(401).json({ error: "A valid sign-in session is required." });
+    return;
+  }
+
+  const accessToken = authorizationParts[1];
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser(accessToken);
+
+  if (userError || !user) {
+    response.status(401).json({ error: "Your sign-in session is invalid or has expired." });
+    return;
+  }
+
+  const { data: adminUser, error: adminUserError } = await supabase
+    .from(adminUsersTable)
+    .select("user_id, email, is_active, admin_role")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (adminUserError) {
+    response.status(500).json({ error: "Admin access could not be verified." });
+    return;
+  }
+
+  if (
+    !adminUser ||
+    (adminUser.admin_role !== "admin" && adminUser.admin_role !== "super_admin")
+  ) {
+    response.status(403).json({ error: "Your account is not approved for CMS access." });
+    return;
+  }
+
+  response.locals.adminUser = {
+    userId: user.id,
+    email: adminUser.email,
+    adminRole: adminUser.admin_role,
+  };
+  next();
+}
+
+let supabaseClient: SupabaseClient | null | undefined;
+
+function getSupabaseClient() {
+  if (supabaseClient !== undefined) {
+    return supabaseClient;
+  }
+
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    supabaseClient = null;
+    return supabaseClient;
+  }
+
+  supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      persistSession: false,
+    },
+  });
+
+  return supabaseClient;
 }
 
 function parsePairingImportRequest(

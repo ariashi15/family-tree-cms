@@ -49,10 +49,19 @@ Add your Supabase project credentials to `apps/api/.env`:
 SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_SECRET_KEY=your-secret-key
 SUPABASE_MEMBERS_TABLE=members
+SUPABASE_ADMIN_USERS_TABLE=admin_users
 ```
 
 Use the Supabase secret key on the API only. Do not place it in the frontend
 `.env` file.
+
+Add the browser-safe Supabase credentials to `apps/web/.env`:
+
+```sh
+VITE_API_URL=http://localhost:3000
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-publishable-key
+```
 
 ## Development
 
@@ -74,8 +83,15 @@ origins. Add the separate client application's origin when it is known.
 The backend currently exposes these endpoints:
 
 - `GET /api/health` returns API status and whether Supabase is configured
-- `GET /api/members` returns rows from the members table
-- `POST /api/pairings/import` creates missing big and little rows
+- `GET /api/public/members` publicly returns rows for the separate client application
+- `GET /api/members` returns rows to an approved CMS admin
+- `POST /api/members`, `PATCH /api/members/:id`, and `DELETE /api/members/:id`
+  modify member rows for an approved CMS admin
+- `POST /api/pairings/import` creates missing big and little rows for an approved CMS admin
+
+All routes except `/api/health` and `/api/public/members` require a valid
+Supabase access token in the `Authorization: Bearer <token>` header. The API
+also verifies that the token's user ID belongs to an active `admin_users` row.
 
 `POST /api/pairings/import` expects this JSON body:
 

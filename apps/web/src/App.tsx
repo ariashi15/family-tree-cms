@@ -10,6 +10,29 @@ const apiUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3000").replace
   "",
 );
 
+async function authenticatedApiFetch(url: string, init?: RequestInit) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured in the frontend.");
+  }
+
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  if (error || !session?.access_token) {
+    throw new Error("Your sign-in session is unavailable or has expired.");
+  }
+
+  const headers = new Headers(init?.headers);
+  headers.set("Authorization", `Bearer ${session.access_token}`);
+
+  return fetch(url, {
+    ...init,
+    headers,
+  });
+}
+
 type Tab = "members" | "bulk-upload" | "admin-users";
 
 type UploadState = "pending" | "uploaded" | "uploaded-with-skips" | "skipped";
@@ -808,7 +831,7 @@ function App() {
     setMembersError("");
 
     try {
-      const response = await fetch(`${apiUrl}/api/members`);
+      const response = await authenticatedApiFetch(`${apiUrl}/api/members`);
       const payload = (await response.json()) as MembersResponse | ApiErrorResponse;
 
       if (!response.ok) {
@@ -1012,7 +1035,7 @@ function App() {
     setUploadSuccessDialog(null);
 
     try {
-      const response = await fetch(`${apiUrl}/api/pairings/import`, {
+      const response = await authenticatedApiFetch(`${apiUrl}/api/pairings/import`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1457,7 +1480,7 @@ function App() {
     setMembersError("");
 
     try {
-      const response = await fetch(`${apiUrl}/api/members`, {
+      const response = await authenticatedApiFetch(`${apiUrl}/api/members`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1602,7 +1625,7 @@ function App() {
     );
 
     try {
-      const response = await fetch(`${apiUrl}/api/members/${memberId}`, {
+      const response = await authenticatedApiFetch(`${apiUrl}/api/members/${memberId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -1698,7 +1721,7 @@ function App() {
     );
 
     try {
-      const response = await fetch(`${apiUrl}/api/members/${memberId}`, {
+      const response = await authenticatedApiFetch(`${apiUrl}/api/members/${memberId}`, {
         method: "DELETE",
       });
 
