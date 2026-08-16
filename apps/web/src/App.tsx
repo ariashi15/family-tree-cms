@@ -513,7 +513,7 @@ function App() {
     void loadMembers();
   }, [isAuthenticated]);
 
-  async function verifyAdminAccess(user: User) {
+  async function verifyAdminAccess(_user: User) {
     if (!supabase) {
       return {
         approved: false as const,
@@ -522,50 +522,36 @@ function App() {
       };
     }
 
-    const normalizedEmail = user.email?.trim().toLocaleLowerCase();
+    let response: Response;
 
-    if (!normalizedEmail) {
+    try {
+      response = await authenticatedApiFetch(`${apiUrl}/api/auth/claim-access`, {
+        method: "POST",
+      });
+    } catch {
       return {
         approved: false as const,
-        error: "This account does not have an email address, so CMS access cannot be verified.",
+        error: "Your account signed in, but the CMS could not verify admin access.",
       };
     }
 
-    const { data, error } = await supabase
-      .from("admin_users")
-      .select("email, user_id, is_active, admin_role")
-      .ilike("email", normalizedEmail)
-      .maybeSingle();
+    const payload = (await response.json()) as
+      | { admin: ApprovedAdmin }
+      | ApiErrorResponse;
 
-    if (error) {
+    if (!response.ok || !("admin" in payload)) {
       return {
         approved: false as const,
         error:
-          "Your account signed in, but the CMS could not verify admin access. Check the admin_users table and its RLS policies.",
+          "error" in payload && payload.error
+            ? payload.error
+            : "Your account is not approved for CMS access.",
       };
-    }
-
-    if (!data || !data.is_active) {
-      return {
-        approved: false as const,
-        error: "Your account is not approved for CMS access.",
-      };
-    }
-
-    if (data.user_id == null) {
-      await supabase
-        .from("admin_users")
-        .update({ user_id: user.id })
-        .ilike("email", normalizedEmail)
-        .is("user_id", null);
     }
 
     return {
       approved: true as const,
-      admin: {
-        email: normalizedEmail,
-        adminRole: data.admin_role,
-      },
+      admin: payload.admin,
     };
   }
 
@@ -616,28 +602,36 @@ function App() {
   };
 
   async function loadAdminUsers() {
-    if (!supabase || approvedAdmin?.adminRole !== "super_admin") {
+    if (approvedAdmin?.adminRole !== "super_admin") {
       return;
     }
 
     setIsAdminUsersLoading(true);
     setAdminUsersError("");
 
-    const { data, error } = await supabase
-      .from("admin_users")
-      .select("email, user_id, is_active, admin_role")
-      .order("email", { ascending: true });
+    try {
+      const response = await authenticatedApiFetch(`${apiUrl}/api/admin-users`);
+      const payload = (await response.json()) as
+        | { adminUsers: AdminUser[] }
+        | ApiErrorResponse;
 
-    if (error) {
+      if (!response.ok || !("adminUsers" in payload)) {
+        setAdminUsersError(
+          "error" in payload && payload.error
+            ? payload.error
+            : "The admin user list could not be loaded.",
+        );
+        return;
+      }
+
+      setAdminUsers(payload.adminUsers);
+    } catch {
       setAdminUsersError(
-        "The admin user list could not be loaded. Check the admin_users RLS policies.",
+        "The admin user list could not be loaded. Please check the API connection.",
       );
+    } finally {
       setIsAdminUsersLoading(false);
-      return;
     }
-
-    setAdminUsers((data ?? []) as AdminUser[]);
-    setIsAdminUsersLoading(false);
   }
 
   const openAdminUserForm = (adminUser?: AdminUser) => {
@@ -669,16 +663,6 @@ function App() {
       return;
     }
 
-    if (!supabase) {
-      setAdminUserForm((currentForm) => ({
-        ...currentForm,
-        error:
-          "Supabase is not configured in the frontend. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in apps/web/.env.",
-        isSubmitting: false,
-      }));
-      return;
-    }
-
     const trimmedEmail = adminUserForm.email.trim().toLocaleLowerCase();
 
     setAdminUserForm((currentForm) => ({
@@ -698,19 +682,32 @@ function App() {
     const existingAdmin = adminUsers.find((currentAdmin) => currentAdmin.email === trimmedEmail);
     const targetEmail = adminUserForm.originalEmail ?? existingAdmin?.email ?? trimmedEmail;
 
-    const { error } = adminUserForm.originalEmail || existingAdmin
-      ? await supabase
-          .from("admin_users")
-          .update(payload)
-          .eq("email", targetEmail)
-      : await supabase.from("admin_users").insert(payload);
+    try {
+      const isUpdate = Boolean(adminUserForm.originalEmail || existingAdmin);
+      const response = await authenticatedApiFetch(`${apiUrl}/api/admin-users`, {
+        method: isUpdate ? "PATCH" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...payload,
+          ...(isUpdate ? { original_email: targetEmail } : {}),
+        }),
+      });
+      const responsePayload = (await response.json()) as ApiErrorResponse;
 
-    if (error) {
+      if (!response.ok) {
+        setAdminUserForm((currentForm) => ({
+          ...currentForm,
+          error: responsePayload.error || "The admin user could not be saved.",
+          isSubmitting: false,
+        }));
+        return;
+      }
+    } catch {
       setAdminUserForm((currentForm) => ({
         ...currentForm,
-        error:
-          error.message ||
-          "The admin user could not be saved. Check the admin_users RLS policies.",
+        error: "The admin user could not be saved. Please check the API connection.",
         isSubmitting: false,
       }));
       return;

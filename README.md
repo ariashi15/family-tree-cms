@@ -13,9 +13,9 @@ packages/
   shared/    Placeholder for future shared types and validation schemas
 ```
 
-The API is intended to serve both the CMS frontend and a separate client
-application. This initial scaffold contains no database integration,
-authentication, content models, or CMS business logic.
+The API serves both the authenticated CMS frontend and a separate public
+client. CMS routes validate Supabase sessions and approved admin access before
+using the backend's privileged database client.
 
 ## Prerequisites
 
@@ -63,6 +63,17 @@ VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=your-publishable-key
 ```
 
+Apply the checked-in Supabase security migration before using authentication:
+
+```text
+supabase/migrations/20260816000000_secure_admin_users.sql
+```
+
+You can paste that file into the Supabase SQL Editor and run it. It normalizes
+admin emails, enforces unique emails and linked user IDs, and removes direct
+browser access to `admin_users`. Admin access and admin management then go
+through the authenticated API.
+
 ## Development
 
 Run the frontend and backend together:
@@ -84,10 +95,12 @@ The backend currently exposes these endpoints:
 
 - `GET /api/health` returns API status and whether Supabase is configured
 - `GET /api/public/members` publicly returns rows for the separate client application
+- `POST /api/auth/claim-access` securely links an approved email to its authenticated user ID
 - `GET /api/members` returns rows to an approved CMS admin
 - `POST /api/members`, `PATCH /api/members/:id`, and `DELETE /api/members/:id`
   modify member rows for an approved CMS admin
 - `POST /api/pairings/import` creates missing big and little rows for an approved CMS admin
+- `GET`, `POST`, and `PATCH /api/admin-users` manage approved users for a super admin
 
 All routes except `/api/health` and `/api/public/members` require a valid
 Supabase access token in the `Authorization: Bearer <token>` header. The API

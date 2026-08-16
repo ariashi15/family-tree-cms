@@ -5,7 +5,26 @@ import express, {
   type Request,
   type Response,
 } from "express";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  createClient,
+  type SupabaseClient,
+  type User,
+} from "@supabase/supabase-js";
+
+type AdminRole = "super_admin" | "admin";
+
+type AdminUserRow = {
+  email: string;
+  user_id: string | null;
+  is_active: boolean;
+  admin_role: AdminRole;
+};
+
+type AdminUserInput = {
+  email: string;
+  admin_role: AdminRole;
+  is_active: boolean;
+};
 
 type PairingImportRow = {
   big_name: string;
@@ -86,10 +105,21 @@ app.get("/api/health", (_request, response) => {
 
 app.get("/api/public/members", listMembers);
 
-app.use("/api/members", requireApprovedAdmin);
-app.use("/api/pairings/import", requireApprovedAdmin);
+app.post("/api/auth/claim-access", requireAuthenticatedUser, claimAdminAccess);
+
+app.use("/api/members", requireAuthenticatedUser, requireApprovedAdmin);
+app.use("/api/pairings/import", requireAuthenticatedUser, requireApprovedAdmin);
+app.use(
+  "/api/admin-users",
+  requireAuthenticatedUser,
+  requireApprovedAdmin,
+  requireSuperAdmin,
+);
 
 app.get("/api/members", listMembers);
+app.get("/api/admin-users", listAdminUsers);
+app.post("/api/admin-users", createAdminUser);
+app.patch("/api/admin-users", updateAdminUser);
 
 async function listMembers(
   _request: Request,
@@ -118,6 +148,219 @@ async function listMembers(
   response.json({
     members: (data ?? []) as MemberRow[],
   });
+}
+
+async function claimAdminAccess(_request: Request, response: Response) {
+  const supabase = getSupabaseClient();
+  const user = response.locals.authUser as User | undefined;
+
+  if (!supabase || !user) {
+    response.status(500).json({ error: "Admin access could not be verified." });
+    return;
+  }
+
+  const normalizedEmail = normalizeEmail(user.email);
+
+  if (!normalizedEmail) {
+    response.status(403).json({
+      error: "This account does not have an email address, so CMS access cannot be verified.",
+    });
+    return;
+  }
+
+  const { data: linkedAdmin, error: linkedAdminError } = await supabase
+    .from(adminUsersTable)
+    .select("email, user_id, is_active, admin_role")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (linkedAdminError) {
+    response.status(500).json({ error: "Admin access could not be verified." });
+    return;
+  }
+
+  if (linkedAdmin) {
+    if (!isApprovedAdminRow(linkedAdmin)) {
+      response.status(403).json({ error: "Your account is not approved for CMS access." });
+      return;
+    }
+
+    response.json({
+      admin: {
+        email: linkedAdmin.email,
+        adminRole: linkedAdmin.admin_role,
+      },
+    });
+    return;
+  }
+
+  const { data: pendingAdmin, error: pendingAdminError } = await supabase
+    .from(adminUsersTable)
+    .select("email, user_id, is_active, admin_role")
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+
+  if (pendingAdminError) {
+    response.status(500).json({ error: "Admin access could not be verified." });
+    return;
+  }
+
+  if (!pendingAdmin || !isApprovedAdminRow(pendingAdmin)) {
+    response.status(403).json({ error: "Your account is not approved for CMS access." });
+    return;
+  }
+
+  if (pendingAdmin.user_id && pendingAdmin.user_id !== user.id) {
+    response.status(403).json({
+      error: "This approved email is already linked to a different account.",
+    });
+    return;
+  }
+
+  const { data: claimedAdmin, error: claimError } = await supabase
+    .from(adminUsersTable)
+    .update({ user_id: user.id })
+    .eq("email", normalizedEmail)
+    .is("user_id", null)
+    .select("email, user_id, is_active, admin_role")
+    .single();
+
+  if (claimError || !claimedAdmin || !isApprovedAdminRow(claimedAdmin)) {
+    response.status(409).json({
+      error: "Admin access could not be linked to this account. Please try again or contact a super admin.",
+    });
+    return;
+  }
+
+  response.json({
+    admin: {
+      email: claimedAdmin.email,
+      adminRole: claimedAdmin.admin_role,
+    },
+  });
+}
+
+async function listAdminUsers(_request: Request, response: Response) {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    response.status(500).json({ error: "Admin users could not be loaded." });
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from(adminUsersTable)
+    .select("email, user_id, is_active, admin_role")
+    .order("email", { ascending: true });
+
+  if (error) {
+    response.status(500).json({ error: "Admin users could not be loaded." });
+    return;
+  }
+
+  response.json({ adminUsers: (data ?? []) as AdminUserRow[] });
+}
+
+async function createAdminUser(request: Request, response: Response) {
+  const supabase = getSupabaseClient();
+  const input = parseAdminUserInput(request.body);
+
+  if (!supabase) {
+    response.status(500).json({ error: "The admin user could not be saved." });
+    return;
+  }
+
+  if (!input) {
+    response.status(400).json({
+      error: "A valid email, admin role, and active status are required.",
+    });
+    return;
+  }
+
+  const { data: existingAdmin, error: existingAdminError } = await supabase
+    .from(adminUsersTable)
+    .select("email")
+    .eq("email", input.email)
+    .maybeSingle();
+
+  if (existingAdminError) {
+    response.status(500).json({ error: "The admin user could not be saved." });
+    return;
+  }
+
+  if (existingAdmin) {
+    response.status(409).json({ error: `${input.email} is already an approved admin.` });
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from(adminUsersTable)
+    .insert({ ...input, user_id: null })
+    .select("email, user_id, is_active, admin_role")
+    .single();
+
+  if (error || !data) {
+    response.status(500).json({ error: "The admin user could not be saved." });
+    return;
+  }
+
+  response.status(201).json({ adminUser: data as AdminUserRow });
+}
+
+async function updateAdminUser(request: Request, response: Response) {
+  const supabase = getSupabaseClient();
+  const input = parseAdminUserInput(request.body);
+  const originalEmail = normalizeEmail(
+    request.body && typeof request.body === "object"
+      ? (request.body as Record<string, unknown>).original_email
+      : undefined,
+  );
+
+  if (!supabase) {
+    response.status(500).json({ error: "The admin user could not be saved." });
+    return;
+  }
+
+  if (!input || !originalEmail) {
+    response.status(400).json({
+      error: "The original email and valid updated admin fields are required.",
+    });
+    return;
+  }
+
+  const { data: currentAdmin, error: currentAdminError } = await supabase
+    .from(adminUsersTable)
+    .select("email, user_id")
+    .eq("email", originalEmail)
+    .maybeSingle();
+
+  if (currentAdminError) {
+    response.status(500).json({ error: "The admin user could not be saved." });
+    return;
+  }
+
+  if (!currentAdmin) {
+    response.status(404).json({ error: "That admin user could not be found." });
+    return;
+  }
+
+  const emailChanged = input.email !== originalEmail;
+  const { data, error } = await supabase
+    .from(adminUsersTable)
+    .update({
+      ...input,
+      user_id: emailChanged ? null : currentAdmin.user_id,
+    })
+    .eq("email", originalEmail)
+    .select("email, user_id, is_active, admin_role")
+    .single();
+
+  if (error || !data) {
+    response.status(500).json({ error: "The admin user could not be saved." });
+    return;
+  }
+
+  response.json({ adminUser: data as AdminUserRow });
 }
 
 app.post("/api/members", async (request, response) => {
@@ -706,7 +949,7 @@ app.listen(port, () => {
   console.log(`API listening on http://localhost:${port}`);
 });
 
-async function requireApprovedAdmin(
+async function requireAuthenticatedUser(
   request: Request,
   response: Response,
   next: NextFunction,
@@ -744,6 +987,23 @@ async function requireApprovedAdmin(
     return;
   }
 
+  response.locals.authUser = user;
+  next();
+}
+
+async function requireApprovedAdmin(
+  _request: Request,
+  response: Response,
+  next: NextFunction,
+) {
+  const supabase = getSupabaseClient();
+  const user = response.locals.authUser as User | undefined;
+
+  if (!supabase || !user) {
+    response.status(401).json({ error: "A valid sign-in session is required." });
+    return;
+  }
+
   const { data: adminUser, error: adminUserError } = await supabase
     .from(adminUsersTable)
     .select("user_id, email, is_active, admin_role")
@@ -772,6 +1032,23 @@ async function requireApprovedAdmin(
   next();
 }
 
+function requireSuperAdmin(
+  _request: Request,
+  response: Response,
+  next: NextFunction,
+) {
+  const adminUser = response.locals.adminUser as
+    | { adminRole?: AdminRole }
+    | undefined;
+
+  if (adminUser?.adminRole !== "super_admin") {
+    response.status(403).json({ error: "Super-admin access is required." });
+    return;
+  }
+
+  next();
+}
+
 let supabaseClient: SupabaseClient | null | undefined;
 
 function getSupabaseClient() {
@@ -793,6 +1070,47 @@ function getSupabaseClient() {
   });
 
   return supabaseClient;
+}
+
+function normalizeEmail(value: unknown) {
+  return typeof value === "string"
+    ? value.trim().toLocaleLowerCase()
+    : "";
+}
+
+function isApprovedAdminRow(value: unknown): value is AdminUserRow {
+  if (!value || typeof value !== "object") return false;
+
+  const row = value as Partial<AdminUserRow>;
+
+  return (
+    row.is_active === true &&
+    (row.admin_role === "admin" || row.admin_role === "super_admin")
+  );
+}
+
+function parseAdminUserInput(value: unknown): AdminUserInput | null {
+  if (!value || typeof value !== "object") return null;
+
+  const payload = value as Record<string, unknown>;
+  const email = normalizeEmail(payload.email);
+  const adminRole = payload.admin_role;
+  const isActive = payload.is_active;
+
+  if (
+    !email ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+    (adminRole !== "admin" && adminRole !== "super_admin") ||
+    typeof isActive !== "boolean"
+  ) {
+    return null;
+  }
+
+  return {
+    email,
+    admin_role: adminRole,
+    is_active: isActive,
+  };
 }
 
 function parsePairingImportRequest(
