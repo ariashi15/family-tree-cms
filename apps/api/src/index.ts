@@ -1,8 +1,5 @@
 import cors from "cors";
 import "dotenv/config";
-import { existsSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import express, {
   type NextFunction,
   type Request,
@@ -83,7 +80,6 @@ type MemberCreateRequest = MemberUpdateRequest & {
 const allowedDynasties = new Set(["fire", "water", "earth", "wind"]);
 
 export const app = express();
-const port = Number(process.env.PORT ?? 3000);
 const isProduction = process.env.NODE_ENV === "production";
 const allowedOrigins = process.env.CORS_ORIGIN
   ?.split(",")
@@ -1026,34 +1022,6 @@ app.post("/api/pairings/import", async (request, response) => {
   });
 });
 
-const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
-const webDistDirectory = path.resolve(currentDirectory, "../../web/dist");
-const webIndexPath = path.join(webDistDirectory, "index.html");
-
-if (isProduction) {
-  if (!existsSync(webIndexPath)) {
-    throw new Error(
-      "The frontend production build is missing. Run `pnpm build` before `pnpm start`.",
-    );
-  }
-
-  app.use(express.static(webDistDirectory));
-  app.use((request, response, next) => {
-    if (request.method !== "GET" || request.path.startsWith("/api/")) {
-      next();
-      return;
-    }
-
-    response.sendFile(webIndexPath);
-  });
-}
-
-if (process.env.NODE_ENV !== "test") {
-  app.listen(port, () => {
-    console.log(`CMS listening on http://localhost:${port}`);
-  });
-}
-
 async function requireAuthenticatedUser(
   request: Request,
   response: Response,
@@ -1095,6 +1063,8 @@ async function requireAuthenticatedUser(
   response.locals.authUser = user;
   next();
 }
+
+export default app;
 
 async function requireApprovedAdmin(
   _request: Request,

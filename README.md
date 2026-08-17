@@ -267,7 +267,7 @@ Import behavior:
 - A pairing can partially succeed. For example, an existing big can be
   skipped while a new little from the same row is still inserted.
 
-## Build and production start
+## Build and local production start
 
 Build every workspace package:
 
@@ -275,35 +275,38 @@ Build every workspace package:
 pnpm build
 ```
 
-After building, start the production server:
+After building, start the compiled API locally:
 
 ```sh
 pnpm start
 ```
 
-The Express process serves both the API and the compiled frontend from one
-origin. `vite preview` is available as `pnpm --filter @family-tree-cms/web
-preview` for local build inspection only; it is not the production server.
+The API process listens on `PORT`. Inspect the compiled frontend locally with
+`pnpm --filter @family-tree-cms/web preview`. Vercel serves the frontend's
+static build and runs the API as a serverless Express function in production.
 
-### Production environment and hosting
+## Deploying to Vercel
 
-Deploy the repository to a Node.js host that runs these commands:
+Create two Vercel projects from this same repository. Do not deploy the
+repository root as a single project.
+
+### 1. Deploy the API project
+
+Import the repository in Vercel and configure the project as follows:
+
+- **Project name:** for example, `family-tree-cms-api`
+- **Root Directory:** `apps/api`
+- **Framework Preset:** Express (the checked-in `vercel.json` also declares it)
+- **Build and Output settings:** leave the detected defaults in place
+
+Add these variables to the API project's Vercel environment settings:
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm build
-pnpm start
-```
-
-Set these server-side environment variables in the host's secret manager:
-
-```sh
-NODE_ENV=production
 SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_SECRET_KEY=your-secret-key
 SUPABASE_MEMBERS_TABLE=members
 SUPABASE_ADMIN_USERS_TABLE=admin_users
-CORS_ORIGIN=https://cms.example.com
+CORS_ORIGIN=https://your-cms-project.vercel.app
 ```
 
 `CORS_ORIGIN` is fail-closed in production and accepts only exact HTTPS
@@ -311,30 +314,70 @@ origins. Use a comma-separated list only if another browser client must call
 the API directly, for example
 `https://cms.example.com,https://client.example.com`. Do not use `*`, paths,
 or trailing slashes. Requests without an `Origin` header, such as server-side
-requests, remain supported.
+requests, remain supported. Vercel provides the production runtime and port;
+do not set `PORT` or `NODE_ENV` in the dashboard.
 
-The host must terminate HTTPS and redirect HTTP traffic to HTTPS. Replace
-`https://cms.example.com` with the final deployed domain. In Supabase, open
-**Authentication → URL Configuration** and set:
+The API entrypoint exports the Express application for Vercel. The separate
+`server.ts` file starts a long-running process only for local `dev` and `start`
+commands.
 
-- **Site URL:** `https://cms.example.com`
-- **Redirect URLs:** add the exact value `https://cms.example.com`
+Deploy the project and verify:
 
-The magic-link code redirects to `window.location.origin`, so the configured
-Supabase value and deployed origin must match exactly.
+```text
+https://your-api-project.vercel.app/api/health
+```
 
-The frontend build needs the browser-safe values below. They are compiled into
-the JavaScript bundle and must not contain the Supabase secret key:
+### 2. Deploy the frontend project
+
+Import the same repository again as a second Vercel project:
+
+- **Project name:** for example, `family-tree-cms-web`
+- **Root Directory:** `apps/web`
+- **Framework Preset:** Vite (the checked-in `vercel.json` also declares it)
+- **Build Command:** use the detected `pnpm build`
+- **Output Directory:** use the detected `dist`
+
+Add these browser-safe variables to the frontend project's Vercel environment
+settings:
 
 ```sh
+VITE_API_URL=https://your-api-project.vercel.app
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=your-publishable-key
 ```
 
-`VITE_API_URL` is optional in production because the compiled frontend calls
-the same origin by default. Set it only when intentionally deploying the API at
-a different exact HTTPS origin. Never expose `SUPABASE_SECRET_KEY` as a `VITE_`
-variable or commit real `.env` files.
+`VITE_API_URL` must be the API project's HTTPS origin. It may not include
+`/api`, because the frontend adds each endpoint path itself. The app removes an
+accidental trailing slash, but using the bare origin is clearest. Vite embeds
+these values at build time, so redeploy the frontend after changing them.
+
+The frontend's Vercel configuration includes an SPA fallback so refreshing a
+client-side route continues to serve `index.html`.
+
+### 3. Finalize the production origins
+
+Once the frontend has its final Vercel or custom domain, update the API
+project's `CORS_ORIGIN` to that exact origin and redeploy the API. If the
+separate public client calls the API from a browser, add its exact origin as a
+comma-separated value too.
+
+Vercel terminates HTTPS. In Supabase, open
+**Authentication → URL Configuration** and set:
+
+- **Site URL:** the final frontend URL
+- **Redirect URLs:** add the exact frontend URL
+
+The magic-link code redirects to `window.location.origin`, so the configured
+Supabase value and deployed origin must match exactly.
+
+Never add `SUPABASE_SECRET_KEY` to the frontend project, prefix it with
+`VITE_`, or commit real `.env` files. Only the API project should receive that
+secret.
+
+Vercel preview URLs are separate origins. To test a preview frontend against a
+preview or production API, add that exact preview frontend origin to the API
+preview environment's `CORS_ORIGIN`; wildcard origins are intentionally not
+accepted.
 
 ### Verification
 

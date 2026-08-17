@@ -5,10 +5,11 @@ import { isSupabaseConfigured, supabase } from "./lib/supabase";
 
 const expectedColumns = ["big_name", "little_name", "dynasty"];
 const allowedDynasties = ["fire", "water", "earth", "wind"] as const;
+const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
 const apiUrl = (
-  import.meta.env.VITE_API_URL ??
+  configuredApiUrl ||
   (import.meta.env.DEV ? "http://localhost:3000" : window.location.origin)
-).replace(/\/$/, "");
+).replace(/\/+$/, "");
 
 async function authenticatedApiFetch(url: string, init?: RequestInit) {
   if (!supabase) {
