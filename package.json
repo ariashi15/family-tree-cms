@@ -3,12 +3,14 @@
   "private": true,
   "packageManager": "pnpm@10.13.1",
   "scripts": {
-    "dev": "pnpm --parallel --filter @family-tree-cms/web --filter @family-tree-cms/api dev",
-    "build": "pnpm --recursive build",
+    "dev": "node api.js && pnpm --parallel --filter @family-tree-cms/web --filter @family-tree-cms/api dev",
+    "build": "node api.js && pnpm --recursive build",
     "test": "pnpm --recursive --if-present test",
-    "start": "pnpm --filter @family-tree-cms/api start"
+    "start": "node api.js && pnpm --filter @family-tree-cms/api start"
   },
   "devDependencies": {
+    "dotenv": "^8.2.0",
+    "node-fetch": "^3.3.2",
     "typescript": "^5.8.3"
   },
   "pnpm": {
