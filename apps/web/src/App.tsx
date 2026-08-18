@@ -2191,19 +2191,19 @@ function App() {
                 <p className="eyebrow">Database editor</p>
                 <h2 id="members-heading">Edit all member data</h2>
               </div>
-              <button className="choose-button" type="button" onClick={() => void loadMembers()}>
-                Refresh
-              </button>
-            </div>
-
-            <div className="rules-callout" role="note" aria-label="Editing rules">
-              <strong>Editing rules</strong>
-              <ul>
-                <li><span className="inline-code-label">Member Name</span> is required and must be unique.</li>
-                <li><span className="inline-code-label">Big</span> is optional; if you set it, a row for that big will also be created if it doesn't already exist.</li>
-                <li>Renaming someone automatically updates their name in rows where they're someone's big as well.</li>
-                <li>When you delete a big, affected littles get their bigs cleared to <span className="inline-code-label">null</span> automatically.</li>
-              </ul>
+              <div className="preview-heading-actions">
+                <button className="choose-button" type="button" onClick={() => void loadMembers()}>
+                  Refresh
+                </button>
+                <button
+                  className="choose-button table-export-button"
+                  type="button"
+                  disabled={sortedMembers.length === 0}
+                  onClick={handleExportMembers}
+                >
+                  Export CSV
+                </button>
+              </div>
             </div>
 
             {membersError && (
@@ -2361,14 +2361,6 @@ function App() {
                       onChange={(event) => setMemberSearchQuery(event.target.value)}
                     />
                   </label>
-                  <button
-                    className="row-action table-export-button"
-                    type="button"
-                    disabled={sortedMembers.length === 0}
-                    onClick={handleExportMembers}
-                  >
-                    Export CSV
-                  </button>
                 </div>
 
                 {sortedMembers.length === 0 ? (
