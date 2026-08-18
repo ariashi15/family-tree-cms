@@ -370,17 +370,6 @@ function getMemberSortAriaValue(
   return sortState.direction === "asc" ? "ascending" : "descending";
 }
 
-function getMemberSortIcon(
-  activeColumn: MemberSortColumn,
-  sortState: MemberSortState,
-) {
-  if (sortState.column !== activeColumn) {
-    return "△";
-  }
-
-  return sortState.direction === "asc" ? "▲" : "▼";
-}
-
 function formatBool(value: "true" | "false") {
   return value === "true" ? "Yes" : "No";
 }
@@ -2400,10 +2389,19 @@ function App() {
                         >
                           <span>Member Name</span>
                           <span
-                            className={`table-sort-icon ${memberSort.column === "memberName" ? "is-active" : ""}`}
+                            className={`table-sort-icon-pair ${memberSort.column === "memberName" ? "is-active" : ""}`}
                             aria-hidden="true"
                           >
-                            {getMemberSortIcon("memberName", memberSort)}
+                            <span
+                              className={`table-sort-icon-arrow ${memberSort.column === "memberName" && memberSort.direction === "asc" ? "is-selected" : ""}`}
+                            >
+                              ↑
+                            </span>
+                            <span
+                              className={`table-sort-icon-arrow ${memberSort.column === "memberName" && memberSort.direction === "desc" ? "is-selected" : ""}`}
+                            >
+                              ↓
+                            </span>
                           </span>
                         </button>
                       </th>
@@ -2418,10 +2416,19 @@ function App() {
                         >
                           <span>Big</span>
                           <span
-                            className={`table-sort-icon ${memberSort.column === "memberBig" ? "is-active" : ""}`}
+                            className={`table-sort-icon-pair ${memberSort.column === "memberBig" ? "is-active" : ""}`}
                             aria-hidden="true"
                           >
-                            {getMemberSortIcon("memberBig", memberSort)}
+                            <span
+                              className={`table-sort-icon-arrow ${memberSort.column === "memberBig" && memberSort.direction === "asc" ? "is-selected" : ""}`}
+                            >
+                              ↑
+                            </span>
+                            <span
+                              className={`table-sort-icon-arrow ${memberSort.column === "memberBig" && memberSort.direction === "desc" ? "is-selected" : ""}`}
+                            >
+                              ↓
+                            </span>
                           </span>
                         </button>
                       </th>
@@ -2436,10 +2443,19 @@ function App() {
                         >
                           <span>Dynasty</span>
                           <span
-                            className={`table-sort-icon ${memberSort.column === "dynasty" ? "is-active" : ""}`}
+                            className={`table-sort-icon-pair ${memberSort.column === "dynasty" ? "is-active" : ""}`}
                             aria-hidden="true"
                           >
-                            {getMemberSortIcon("dynasty", memberSort)}
+                            <span
+                              className={`table-sort-icon-arrow ${memberSort.column === "dynasty" && memberSort.direction === "asc" ? "is-selected" : ""}`}
+                            >
+                              ↑
+                            </span>
+                            <span
+                              className={`table-sort-icon-arrow ${memberSort.column === "dynasty" && memberSort.direction === "desc" ? "is-selected" : ""}`}
+                            >
+                              ↓
+                            </span>
                           </span>
                         </button>
                       </th>
@@ -2454,10 +2470,19 @@ function App() {
                         >
                           <span>Dynasty Head</span>
                           <span
-                            className={`table-sort-icon ${memberSort.column === "isDynastyHead" ? "is-active" : ""}`}
+                            className={`table-sort-icon-pair ${memberSort.column === "isDynastyHead" ? "is-active" : ""}`}
                             aria-hidden="true"
                           >
-                            {getMemberSortIcon("isDynastyHead", memberSort)}
+                            <span
+                              className={`table-sort-icon-arrow ${memberSort.column === "isDynastyHead" && memberSort.direction === "asc" ? "is-selected" : ""}`}
+                            >
+                              ↑
+                            </span>
+                            <span
+                              className={`table-sort-icon-arrow ${memberSort.column === "isDynastyHead" && memberSort.direction === "desc" ? "is-selected" : ""}`}
+                            >
+                              ↓
+                            </span>
                           </span>
                         </button>
                       </th>

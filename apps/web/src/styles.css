@@ -748,13 +748,20 @@ th {
   text-transform: inherit;
 }
 
-.table-sort-icon {
+.table-sort-icon-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 0rem;
   color: #a3aaa0;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   line-height: 1;
 }
 
-.table-sort-icon.is-active {
+.table-sort-icon-arrow {
+  color: #a3aaa0;
+}
+
+.table-sort-icon-arrow.is-selected {
   color: #385a42;
 }
 
