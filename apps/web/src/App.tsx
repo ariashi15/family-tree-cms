@@ -171,6 +171,13 @@ type UploadSuccessDialogState = {
   message: string;
 } | null;
 
+type MemberSortColumn = "memberName" | "memberBig" | "dynasty" | "isDynastyHead";
+
+type MemberSortState = {
+  column: MemberSortColumn;
+  direction: "asc" | "desc";
+};
+
 type MemberSnapshot = {
   memberName: string;
   memberBig: string;
@@ -286,18 +293,92 @@ function getFirstName(value: string) {
   return value.trim().split(/\s+/)[0]?.toLocaleLowerCase() ?? "";
 }
 
-function sortMembersByFirstName(memberList: EditableMember[]) {
-  return [...memberList].sort((left, right) => {
-    const firstNameComparison = getFirstName(left.memberName).localeCompare(
-      getFirstName(right.memberName),
-    );
+function compareOptionalText(left: string, right: string) {
+  if (!left && !right) return 0;
+  if (!left) return 1;
+  if (!right) return -1;
 
-    if (firstNameComparison !== 0) {
-      return firstNameComparison;
+  return left.localeCompare(right);
+}
+
+function compareMembers(
+  left: EditableMember,
+  right: EditableMember,
+  sortState: MemberSortState,
+) {
+  let comparison = 0;
+
+  if (sortState.column === "memberName") {
+    comparison = getFirstName(left.memberName).localeCompare(getFirstName(right.memberName));
+
+    if (comparison === 0) {
+      comparison = left.memberName.localeCompare(right.memberName);
     }
+  } else if (sortState.column === "memberBig") {
+    comparison = compareOptionalText(left.memberBig, right.memberBig);
+  } else if (sortState.column === "dynasty") {
+    comparison = left.dynasty.localeCompare(right.dynasty);
+  } else {
+    comparison = formatBool(left.isDynastyHead).localeCompare(formatBool(right.isDynastyHead));
+  }
 
-    return left.memberName.localeCompare(right.memberName);
-  });
+  if (comparison === 0) {
+    comparison = getFirstName(left.memberName).localeCompare(getFirstName(right.memberName));
+  }
+
+  if (comparison === 0) {
+    comparison = left.memberName.localeCompare(right.memberName);
+  }
+
+  return sortState.direction === "asc" ? comparison : comparison * -1;
+}
+
+function getSortedMembers(memberList: EditableMember[], sortState: MemberSortState) {
+  return [...memberList].sort((left, right) => compareMembers(left, right, sortState));
+}
+
+function escapeCsvValue(value: string) {
+  if (/[",\n]/.test(value)) {
+    return `"${value.replaceAll('"', '""')}"`;
+  }
+
+  return value;
+}
+
+function buildMembersCsv(memberList: EditableMember[]) {
+  const header = ["member_name", "member_big", "dynasty", "is_dynasty_head"];
+  const rows = memberList.map((member) => [
+    member.memberName,
+    member.memberBig,
+    member.dynasty,
+    member.isDynastyHead === "true" ? "true" : "false",
+  ]);
+
+  return [header, ...rows]
+    .map((row) => row.map((value) => escapeCsvValue(value)).join(","))
+    .join("\n");
+}
+
+function getMemberSortAriaValue(
+  activeColumn: MemberSortColumn,
+  sortState: MemberSortState,
+): "ascending" | "descending" | "none" {
+  if (sortState.column !== activeColumn) {
+    return "none";
+  }
+
+  return sortState.direction === "asc" ? "ascending" : "descending";
+}
+
+function getMemberSortIcon(
+  activeColumn: MemberSortColumn,
+  sortState: MemberSortState,
+) {
+  if (sortState.column !== activeColumn) {
+    return "△";
+  }
+
+  return sortState.direction === "asc" ? "▲" : "▼";
 }
 
 function formatBool(value: "true" | "false") {
@@ -488,6 +569,10 @@ function App() {
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
   const [editDialog, setEditDialog] = useState<EditDialogState>(null);
   const [memberSearchQuery, setMemberSearchQuery] = useState("");
+  const [memberSort, setMemberSort] = useState<MemberSortState>({
+    column: "memberName",
+    direction: "asc",
+  });
   const [memberSnapshots, setMemberSnapshots] = useState<Record<string, MemberSnapshot>>(
     {},
   );
@@ -870,11 +955,7 @@ function App() {
         return;
       }
 
-      setMembers(
-        sortMembersByFirstName(
-          (payload as MembersResponse).members.map(toEditableMember),
-        ),
-      );
+      setMembers((payload as MembersResponse).members.map(toEditableMember));
       setMemberSnapshots(
         Object.fromEntries(
           (payload as MembersResponse).members.map((member) => [
@@ -1058,6 +1139,7 @@ function App() {
           .toLocaleLowerCase()
           .includes(normalizedMemberSearchQuery),
   );
+  const sortedMembers = getSortedMembers(filteredMembers, memberSort);
   const existingNewMemberBig = findMemberByName(newMemberForm.memberBig);
   const originalEditMember = editDialog
     ? memberSnapshots[editDialog.memberId]
@@ -1082,6 +1164,31 @@ function App() {
     invalidPairings.length === 0 &&
     !isReading &&
     !isUploading;
+
+  const handleMemberSort = (column: MemberSortColumn) => {
+    setMemberSort((currentSort) => ({
+      column,
+      direction:
+        currentSort.column === column && currentSort.direction === "asc"
+          ? "desc"
+          : "asc",
+    }));
+  };
+
+  const handleExportMembers = () => {
+    const csv = buildMembersCsv(sortedMembers);
+    const csvBlob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const csvUrl = window.URL.createObjectURL(csvBlob);
+    const exportLink = document.createElement("a");
+    const dateStamp = new Date().toISOString().slice(0, 10);
+
+    exportLink.href = csvUrl;
+    exportLink.download = `members-${dateStamp}.csv`;
+    document.body.appendChild(exportLink);
+    exportLink.click();
+    document.body.removeChild(exportLink);
+    window.URL.revokeObjectURL(csvUrl);
+  };
 
   const handleUpload = async () => {
     if (!canUpload) return;
@@ -2265,25 +2372,101 @@ function App() {
                       onChange={(event) => setMemberSearchQuery(event.target.value)}
                     />
                   </label>
+                  <button
+                    className="row-action table-export-button"
+                    type="button"
+                    disabled={sortedMembers.length === 0}
+                    onClick={handleExportMembers}
+                  >
+                    Export CSV
+                  </button>
                 </div>
 
-                {filteredMembers.length === 0 ? (
+                {sortedMembers.length === 0 ? (
                   <div className="empty-state">No members match that search.</div>
                 ) : (
               <div className="table-scroll">
                 <table>
                   <thead>
                     <tr>
-                      <th scope="col">Member Name</th>
-                      <th scope="col">Big</th>
-                      <th scope="col">Dynasty</th>
-                      <th scope="col">Dynasty Head</th>
+                      <th
+                        scope="col"
+                        aria-sort={getMemberSortAriaValue("memberName", memberSort)}
+                      >
+                        <button
+                          className="table-sort-button"
+                          type="button"
+                          onClick={() => handleMemberSort("memberName")}
+                        >
+                          <span>Member Name</span>
+                          <span
+                            className={`table-sort-icon ${memberSort.column === "memberName" ? "is-active" : ""}`}
+                            aria-hidden="true"
+                          >
+                            {getMemberSortIcon("memberName", memberSort)}
+                          </span>
+                        </button>
+                      </th>
+                      <th
+                        scope="col"
+                        aria-sort={getMemberSortAriaValue("memberBig", memberSort)}
+                      >
+                        <button
+                          className="table-sort-button"
+                          type="button"
+                          onClick={() => handleMemberSort("memberBig")}
+                        >
+                          <span>Big</span>
+                          <span
+                            className={`table-sort-icon ${memberSort.column === "memberBig" ? "is-active" : ""}`}
+                            aria-hidden="true"
+                          >
+                            {getMemberSortIcon("memberBig", memberSort)}
+                          </span>
+                        </button>
+                      </th>
+                      <th
+                        scope="col"
+                        aria-sort={getMemberSortAriaValue("dynasty", memberSort)}
+                      >
+                        <button
+                          className="table-sort-button"
+                          type="button"
+                          onClick={() => handleMemberSort("dynasty")}
+                        >
+                          <span>Dynasty</span>
+                          <span
+                            className={`table-sort-icon ${memberSort.column === "dynasty" ? "is-active" : ""}`}
+                            aria-hidden="true"
+                          >
+                            {getMemberSortIcon("dynasty", memberSort)}
+                          </span>
+                        </button>
+                      </th>
+                      <th
+                        scope="col"
+                        aria-sort={getMemberSortAriaValue("isDynastyHead", memberSort)}
+                      >
+                        <button
+                          className="table-sort-button"
+                          type="button"
+                          onClick={() => handleMemberSort("isDynastyHead")}
+                        >
+                          <span>Dynasty Head</span>
+                          <span
+                            className={`table-sort-icon ${memberSort.column === "isDynastyHead" ? "is-active" : ""}`}
+                            aria-hidden="true"
+                          >
+                            {getMemberSortIcon("isDynastyHead", memberSort)}
+                          </span>
+                        </button>
+                      </th>
                       <th scope="col">Edit</th>
                       <th scope="col">Delete</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredMembers.map((member) => (
+                    {sortedMembers.map((member) => (
                       <tr key={member.id}>
                         <td className="member-name-cell">{member.memberName}</td>
                         <td className="member-big-cell">{member.memberBig || "None"}</td>
