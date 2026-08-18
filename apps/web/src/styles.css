@@ -527,8 +527,6 @@ h1 {
 .search-row {
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
   padding: 1.25rem 2rem 1rem;
 }
 
@@ -549,10 +547,12 @@ h1 {
 
 .table-export-button {
   min-width: 8rem;
-  min-height: 2.85rem;
-  padding-top: 0;
-  padding-bottom: 0;
   white-space: nowrap;
+}
+
+.table-export-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .format-guide {
@@ -660,6 +660,12 @@ h1 {
   gap: 1rem;
   padding: 1.65rem 2rem;
   border-bottom: 1px solid #e1e3dd;
+}
+
+.preview-heading-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .preview-heading .eyebrow {
@@ -1163,6 +1169,16 @@ tbody tr.skipped-row:hover {
   .preview-heading {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .preview-heading-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .preview-heading-actions > * {
+    width: 100%;
   }
 
   .tab-nav {
