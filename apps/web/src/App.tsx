@@ -10,8 +10,20 @@ const apiUrl = (
   configuredApiUrl ||
   (import.meta.env.DEV ? "http://localhost:3000" : window.location.origin)
 ).replace(/\/+$/, "");
+let isDevelopmentAuthBypassed = false;
 
 async function authenticatedApiFetch(url: string, init?: RequestInit) {
+  const headers = new Headers(init?.headers);
+
+  if (import.meta.env.DEV && isDevelopmentAuthBypassed) {
+    headers.set("X-Dev-Auth-Bypass", "true");
+
+    return fetch(url, {
+      ...init,
+      headers,
+    });
+  }
+
   if (!supabase) {
     throw new Error("Supabase is not configured in the frontend.");
   }
@@ -25,7 +37,6 @@ async function authenticatedApiFetch(url: string, init?: RequestInit) {
     throw new Error("Your sign-in session is unavailable or has expired.");
   }
 
-  const headers = new Headers(init?.headers);
   headers.set("Authorization", `Bearer ${session.access_token}`);
 
   return fetch(url, {
@@ -468,6 +479,7 @@ function wouldCreateBigCycle(
 
 function App() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const isLocalAuthBypassEnabled = import.meta.env.DEV;
   const [activeTab, setActiveTab] = useState<Tab>("members");
 
   const [members, setMembers] = useState<EditableMember[]>([]);
@@ -1269,13 +1281,34 @@ function App() {
   };
 
   const handleSignOut = async () => {
-    if (!supabase) return;
+    isDevelopmentAuthBypassed = false;
 
-    await supabase.auth.signOut();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+
     setApprovedAdmin(null);
     setIsAuthenticated(false);
     setLoginForm({
       email: "",
+      error: "",
+      success: "",
+      isSubmitting: false,
+    });
+  };
+
+  const handleBypassAuth = () => {
+    if (!isLocalAuthBypassEnabled) return;
+
+    isDevelopmentAuthBypassed = true;
+    setApprovedAdmin({
+      email: "local-test@dev",
+      adminRole: "super_admin",
+    });
+    setIsAuthenticated(true);
+    setIsAuthLoading(false);
+    setLoginForm({
+      email: "local-test@dev",
       error: "",
       success: "",
       isSubmitting: false,
@@ -2007,6 +2040,16 @@ function App() {
                     : "Send magic link"}
               </button>
 
+              {isLocalAuthBypassEnabled ? (
+                <button
+                  className="choose-button auth-bypass"
+                  type="button"
+                  disabled={isAuthLoading}
+                  onClick={handleBypassAuth}
+                >
+                  Bypass auth for local testing
+                </button>
+              ) : null}
             </form>
           </section>
         </main>
@@ -2602,7 +2645,7 @@ function App() {
                 </form>
               </div>
 
-              <div className="preview-card admin-user-list-card" aria-labelledby="admin-user-list-heading">
+              <div className="admin-user-list-card" aria-labelledby="admin-user-list-heading">
                 <div className="preview-heading">
                   <div>
                     <p className="eyebrow">Current access</p>

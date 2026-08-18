@@ -89,6 +89,9 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SECRET_KEY;
 const membersTable = process.env.SUPABASE_MEMBERS_TABLE ?? "members";
 const adminUsersTable = process.env.SUPABASE_ADMIN_USERS_TABLE ?? "admin_users";
+const isDevelopmentAuthBypassEnabled =
+  process.env.NODE_ENV === "development" &&
+  process.env.DEV_AUTH_BYPASS === "true";
 
 if (
   isProduction &&
@@ -1027,6 +1030,19 @@ async function requireAuthenticatedUser(
   response: Response,
   next: NextFunction,
 ) {
+  if (
+    isDevelopmentAuthBypassEnabled &&
+    request.header("x-dev-auth-bypass") === "true"
+  ) {
+    response.locals.authUser = {
+      id: "local-development-auth-bypass",
+      email: "local-test@dev",
+    };
+    response.locals.isDevelopmentAuthBypass = true;
+    next();
+    return;
+  }
+
   const supabase = getSupabaseClient();
 
   if (!supabase) {
@@ -1071,6 +1087,16 @@ async function requireApprovedAdmin(
   response: Response,
   next: NextFunction,
 ) {
+  if (response.locals.isDevelopmentAuthBypass === true) {
+    response.locals.adminUser = {
+      userId: "local-development-auth-bypass",
+      email: "local-test@dev",
+      adminRole: "super_admin",
+    };
+    next();
+    return;
+  }
+
   const supabase = getSupabaseClient();
   const user = response.locals.authUser as User | undefined;
 

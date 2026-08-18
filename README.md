@@ -89,6 +89,11 @@ pnpm dev
 The backend's `CORS_ORIGIN` setting accepts a comma-separated list of allowed
 origins. Add the separate client application's origin when it is known.
 
+In Vite development mode, the login page includes a **Bypass auth for local
+testing** button. The API honors that bypass only when both
+`NODE_ENV=development` and `DEV_AUTH_BYPASS=true` are set in `apps/api/.env`.
+Never add `DEV_AUTH_BYPASS` to a deployed environment.
+
 ## API endpoints
 
 The backend currently exposes these endpoints:

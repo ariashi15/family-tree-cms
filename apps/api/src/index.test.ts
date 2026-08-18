@@ -72,6 +72,17 @@ test("protected routes reject a non-bearer authorization scheme", async () => {
   });
 });
 
+test("development auth bypass headers are rejected outside development", async () => {
+  const response = await fetch(`${baseUrl}/api/members`, {
+    headers: { "X-Dev-Auth-Bypass": "true" },
+  });
+
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), {
+    error: "A valid sign-in session is required.",
+  });
+});
+
 test("a rename cannot use the member's old name as their new big", () => {
   assert.equal(isSelfBigReference("Alice Wong", "Alice Chen", "alice wong"), true);
 });
